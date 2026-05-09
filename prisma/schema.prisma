@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model FundingRateSnapshot {
+  id              String    @id @default(cuid())
+  symbol          String
+  exchange        String
+  fundingRate     Float
+  markPrice       Float?
+  indexPrice      Float?
+  nextFundingTime DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([symbol, exchange])
+  @@index([createdAt])
+}
+
+model Opportunity {
+  id                 String    @id @default(cuid())
+  symbol             String
+  buyExchange        String
+  sellExchange       String
+  fundingRateDiff    Float
+  annualizedReturn   Float
+  riskScore          Int
+  netProfitPerPeriod Float
+  positionSizeUSD    Float
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  closedAt           DateTime?
+
+  @@index([status])
+  @@index([annualizedReturn])
+}
+
+model Position {
+  id             String    @id @default(cuid())
+  userId         String
+  symbol         String
+  exchange       String
+  side           String
+  spotEntryPrice Float
+  perpEntryPrice Float
+  positionSize   Float
+  fundingEarned  Float     @default(0)
+  totalFeesPaid  Float     @default(0)
+  pnl            Float     @default(0)
+  status         String    @default("OPEN")
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String
+  symbol      String
+  exchange    String
+  message     String
+  threshold   Float?
+  triggered   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  triggeredAt DateTime?
+
+  @@index([userId, triggered])
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  defaultCapital     Float    @default(5)
+  riskTolerance      Int      @default(5)
+  preferredExchanges String   @default("OKX,BINANCE,BYBIT")
+  alertEmail         Boolean  @default(false)
+  alertPush          Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model FundingRateHistory {
+  id          String   @id @default(cuid())
+  symbol      String
+  exchange    String
+  fundingRate Float
+  timestamp   DateTime
+
+  @@index([symbol, exchange, timestamp])
+}
+
+// ── VALIDADOR DE EDGE ─────────────────────────────────────────
+
+model EdgeSnapshot {
+  id            String   @id @default(cuid())
+  timestamp     DateTime @default(now())
+  symbol        String
+  exchangeA     String
+  exchangeB     String
+  fundingRateA  Float
+  fundingRateB  Float
+  spreadRaw     Float
+  feesEstimated Float
+  slippageEst   Float
+  edgeNet       Float
+  volumeA24h    Float
+  volumeB24h    Float
+
+  @@index([symbol, timestamp])
+  @@index([timestamp])
+}
+
+model OpportunityLife {
+  id             String    @id @default(cuid())
+  detectedAt     DateTime  @default(now())
+  symbol         String
+  exchangeA      String
+  exchangeB      String
+  initialSpread  Float
+  spreadAt30s    Float?
+  spreadAt1m     Float?
+  spreadAt5m     Float?
+  spreadAt30m    Float?
+  alive30s       Boolean?
+  alive1m        Boolean?
+  alive5m        Boolean?
+  alive30m       Boolean?
+  edgeNetInitial Float
+  edgeNetAt5m    Float?
+  resolved       Boolean   @default(false)
+
+  @@index([symbol, detectedAt])
+  @@index([detectedAt])
+}
+
+model FundingRealization {
+  id              String    @id @default(cuid())
+  symbol          String
+  exchange        String
+  predictedRate   Float
+  realizedRate    Float?
+  predictionTime  DateTime
+  realizationTime DateTime?
+  error           Float?
+  resolved        Boolean   @default(false)
+
+  @@index([symbol, exchange, predictionTime])
+}
+
+model PaperTrade {
+  id               String    @id @default(cuid())
+  openedAt         DateTime  @default(now())
+  closedAt         DateTime?
+  symbol           String
+  exchangeLong     String
+  exchangeShort    String
+  spreadAtEntry    Float
+  spreadAtExit     Float?
+  edgeNetEntry     Float
+  fundingCollected Float?
+  feesTotal        Float?
+  pnlGross         Float?
+  pnlNet           Float?
+  positionSize     Float
+  status           String    @default("open")
+  closeReason      String?
+
+  @@index([symbol, openedAt])
+  @@index([status])
+}
+
+model ValidationMetrics {
+  id              String   @id @default(cuid())
+  date            DateTime @default(now())
+  totalDetected   Int
+  aliveAfter30s   Int
+  aliveAfter1m    Int
+  aliveAfter5m    Int
+  avgEdgeTheory   Float
+  avgEdgeReal     Float
+  fundingAccuracy Float
+  paperPnl        Float
+  paperWinRate    Float
+  paperSharpe     Float?
+  paperDrawdown   Float
+
+  @@index([date])
+}

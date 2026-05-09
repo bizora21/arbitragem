@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
+
+const PUBLIC_PAGES = ['/login', '/auth/callback', '/auth/confirm']
+
+const PUBLIC_API_PREFIXES = [
+  '/api/funding-rates',
+  '/api/opportunities',
+  '/api/history',
+  '/api/stats',
+]
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  const { response, user } = await updateSession(request)
+
+  // APIs públicas — sem autenticação necessária
+  if (PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return response
+  }
+
+  // Páginas públicas
+  if (PUBLIC_PAGES.some((p) => pathname.startsWith(p))) {
+    // Utilizador autenticado a tentar aceder /login → redireciona para dashboard
+    if (user && pathname === '/login') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    return response
+  }
+
+  // APIs privadas sem sessão → 401
+  if (pathname.startsWith('/api/')) {
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Não autenticado', timestamp: new Date().toISOString() },
+        { status: 401 }
+      )
+    }
+    return response
+  }
+
+  // Páginas privadas sem sessão → /login
+  if (!user) {
+    const loginUrl = new URL('/login', request.url)
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return response
+}
+
+export const config = {
+  routes: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+}
