@@ -30,7 +30,7 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install @supabase/supabase-js --no-save --no-package-lock --ignore-scripts
+        run: npm install @supabase/supabase-js --no-save --no-package-lock --ignore-scripts --legacy-peer-deps
 
       - name: Collect snapshots
         run: node scripts/github-actions/collect-snapshot.mjs
