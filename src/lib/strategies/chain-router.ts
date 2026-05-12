@@ -1,0 +1,103 @@
+import { getGasCost } from './fee-engine'
+
+export type Strategy = 'YIELD' | 'AIRDROP' | 'LP' | 'FUNDING' | 'DEPEG'
+
+export interface ChainScore {
+  chain: string
+  gasCostUsd: number
+  bridgeCostUsd: number
+  gasBreakevenCapital: number  // Minimum capital for gas to be < 5% of gains
+  netAPY: number
+  airdropMultiplier: number
+  rank: number
+  recommended: boolean
+  reason: string
+}
+
+// One-way bridge cost from Ethereum to each L2 (approximate USD)
+const BRIDGE_COSTS: Record<string, number> = {
+  Ethereum: 0,
+  Base:     1.5,
+  Arbitrum: 2.0,
+  Optimism: 1.8,
+  Polygon:  2.5,
+}
+
+// Airdrop activity multiplier: higher = more likely to receive airdrops
+const AIRDROP_MULTIPLIER: Record<string, number> = {
+  Base:      1.8,   // Most active airdrop ecosystem right now
+  Arbitrum:  1.3,
+  Optimism:  1.2,
+  Ethereum:  0.7,
+  Polygon:   0.6,
+}
+
+// Minimum capital recommendations per chain per strategy
+const CAPITAL_FLOOR: Record<Strategy, Partial<Record<string, number>>> = {
+  AIRDROP: { Base: 0.5,  Arbitrum: 2,   Optimism: 1,   Ethereum: 50,  Polygon: 1 },
+  YIELD:   { Base: 1,    Arbitrum: 10,  Optimism: 5,   Ethereum: 500, Polygon: 5 },
+  LP:      { Base: 1,    Arbitrum: 10,  Optimism: 5,   Ethereum: 500, Polygon: 5 },
+  FUNDING: { Base: 5000, Arbitrum: 5000, Optimism: 5000, Ethereum: 5000, Polygon: 5000 },
+  DEPEG:   { Base: 10,   Arbitrum: 50,  Optimism: 20,  Ethereum: 200, Polygon: 20 },
+}
+
+export function rankChains(strategy: Strategy, capital: number, baseAPY: number): ChainScore[] {
+  const chains = ['Base', 'Arbitrum', 'Optimism', 'Ethereum', 'Polygon']
+
+  const scored = chains.map((chain) => {
+    const gasCostPerTx = getGasCost(chain)
+    const bridge = BRIDGE_COSTS[chain] ?? 2
+    // Entry + exit gas + bridge (one-time, amortized over 12 months)
+    const totalEntryCost = gasCostPerTx * 2 + bridge
+    const annualGasCost = gasCostPerTx * 12  // Assume 1 rotation/month
+    const gasPct = capital > 0 ? (totalEntryCost + annualGasCost) / capital * 100 : 999
+    const netAPY = baseAPY - gasPct
+    const multiplier = AIRDROP_MULTIPLIER[chain] ?? 1
+    const floor = CAPITAL_FLOOR[strategy]?.[chain] ?? 1
+    const meetsFloor = capital >= floor
+    // Break-even capital: where gas cost = 5% of annual return
+    const annualReturn = (baseAPY / 100) * capital
+    const breakeven = annualReturn > 0 ? (totalEntryCost + annualGasCost) / 0.05 : 0
+
+    let reason: string
+    if (!meetsFloor) {
+      reason = `Mínimo $${floor} para ${strategy} em ${chain}`
+    } else if (netAPY < 0) {
+      reason = `Gas ($${(totalEntryCost).toFixed(2)}) > retorno com $${capital}`
+    } else if (chain === 'Base' && strategy === 'AIRDROP') {
+      reason = 'Melhor chain para airdrop farming (5-10 protocolos sem token)'
+    } else {
+      reason = `APY líquido ${netAPY.toFixed(1)}% após gas`
+    }
+
+    return {
+      chain,
+      gasCostUsd: parseFloat((gasCostPerTx * 2 + bridge).toFixed(2)),
+      bridgeCostUsd: bridge,
+      gasBreakevenCapital: parseFloat(breakeven.toFixed(0)),
+      netAPY: parseFloat(netAPY.toFixed(2)),
+      airdropMultiplier: multiplier,
+      rank: 0,
+      recommended: meetsFloor && netAPY > 0,
+      reason,
+    }
+  })
+
+  // Sort: recommended first, then by adjusted score
+  scored.sort((a, b) => {
+    const scoreA = a.netAPY + (strategy === 'AIRDROP' ? a.airdropMultiplier * 3 : 0)
+    const scoreB = b.netAPY + (strategy === 'AIRDROP' ? b.airdropMultiplier * 3 : 0)
+    if (a.recommended !== b.recommended) return a.recommended ? -1 : 1
+    return scoreB - scoreA
+  })
+
+  return scored.map((c, i) => ({ ...c, rank: i + 1 }))
+}
+
+export function getBestChain(strategy: Strategy, capital: number, baseAPY: number): string {
+  return rankChains(strategy, capital, baseAPY).find((c) => c.recommended)?.chain ?? 'Base'
+}
+
+export function getChainFloor(strategy: Strategy, chain: string): number {
+  return CAPITAL_FLOOR[strategy]?.[chain] ?? 1
+}

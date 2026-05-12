@@ -1,0 +1,179 @@
+import { supabaseAdmin } from '@/lib/supabase'
+
+// DexScreener API — gratuito, sem API key, dados reais on-chain actualizados a cada bloco
+const DEXSCREENER = 'https://api.dexscreener.com'
+
+// DEXes aceites (dexId do DexScreener)
+const ACCEPTED_DEXES = new Set([
+  'uniswap', 'uniswap-v3', 'uniswap-v2',
+  'sushiswap', 'sushiswap-v3',
+  'pancakeswap', 'pancakeswap-v3',
+  'quickswap', 'quickswap-v3',
+  'camelot',
+  'curve', 'curve-v2',
+  'balancer', 'balancer-v2',
+])
+
+// Chains e tokens a monitorar
+const MONITOR: Record<string, { chain: string; pairs: [string, string, string][] }> = {
+  polygon: {
+    chain: 'polygon',
+    pairs: [
+      // native USDC (0x3c499c) — mais liquido que o antigo USDC.e (0x2791Bca)
+      ['0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', 'USDC-USDT'],
+      ['0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', 'USDC-WETH'],
+      ['0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', '0x8f3Cf7ad23Cd3CaDbD9735AFF958023D60d8476e', 'USDC-DAI'],
+    ],
+  },
+  arbitrum: {
+    chain: 'arbitrum',
+    pairs: [
+      ['0xaf88d065e77c8cC2239327C5EDb3A432268e5831', '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', 'USDC-USDT'],
+      ['0xaf88d065e77c8cC2239327C5EDb3A432268e5831', '0x82aF49447590bF5eA1c2F94ff5389fEd266f06f5', 'USDC-WETH'],
+      ['0xaf88d065e77c8cC2239327C5EDb3A432268e5831', '0xDA10009754f5DB23975B5A6C5FAa564199734482', 'USDC-DAI'],
+    ],
+  },
+  ethereum: {
+    chain: 'ethereum',
+    pairs: [
+      ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0xdAC17F958D2ee523a2206206994597C13D831ec7', 'USDC-USDT'],
+      ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', 'USDC-WETH'],
+      ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', '0x6B175474E89094C44Da98b954EedeAC495271d0F', 'USDC-DAI'],
+    ],
+  },
+  bsc: {
+    chain: 'bsc',
+    pairs: [
+      ['0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', '0x55d398326f99059fF775485246999027B3197955', 'USDC-USDT'],
+      ['0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', '0x2170Ed0880ac9A755fd29B2688956BD959e2Fe26', 'USDC-WETH'],
+    ],
+  },
+}
+
+interface DexScreenerPair {
+  chainId: string
+  dexId:   string
+  pairAddress: string
+  baseToken:  { address: string; symbol: string }
+  quoteToken: { address: string; symbol: string }
+  priceNative: string
+  priceUsd:    string
+  volume:    { h24: number }
+  liquidity: { usd: number }
+  fdv:       number
+}
+
+export interface DEXPriceRow {
+  chain:        string
+  dexName:      string
+  tokenA:       string
+  tokenB:       string
+  priceAtoB:    number
+  priceBtoA:    number
+  liquidityUSD: number
+  slippage100:  number
+  slippage1000: number
+  feeTier:      number
+  amountIn:     number
+  amountOut:    number
+}
+
+async function fetchPairsFromDexScreener(chainId: string, addrA: string, addrB: string): Promise<DexScreenerPair[]> {
+  const url = `${DEXSCREENER}/latest/dex/tokens/${addrA},${addrB}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
+  if (!res.ok) throw new Error(`DexScreener ${res.status}`)
+  const json = await res.json()
+  const pairs: DexScreenerPair[] = json.pairs ?? []
+
+  const addrAl = addrA.toLowerCase()
+  const addrBl = addrB.toLowerCase()
+
+  const filtered = pairs.filter(p => {
+    if (p.chainId !== chainId) return false
+    if (!ACCEPTED_DEXES.has(p.dexId)) return false
+    if ((p.liquidity?.usd ?? 0) < 1000) return false
+    const base  = p.baseToken.address.toLowerCase()
+    const quote = p.quoteToken.address.toLowerCase()
+    return (base === addrAl && quote === addrBl) || (base === addrBl && quote === addrAl)
+  })
+
+  if (pairs.length > 0 && filtered.length === 0) {
+    const sample = pairs.slice(0, 3).map(p => `${p.dexId}@${p.chainId} liq=$${Math.round(p.liquidity?.usd ?? 0)}`)
+    console.log(`[price-monitor] ${chainId} ${addrA.slice(0,8)}: ${pairs.length} pares totais, 0 passaram filtro. Sample: ${sample.join(' | ')}`)
+  }
+
+  return filtered
+}
+
+function slippageFromLiquidity(liquidityUSD: number): number {
+  // Estimativa conservadora: slippage de $1000 num pool
+  if (liquidityUSD > 50_000_000) return 0.001  // >$50M: 0.001%
+  if (liquidityUSD > 10_000_000) return 0.005  // >$10M: 0.005%
+  if (liquidityUSD >  1_000_000) return 0.02   // >$1M:  0.02%
+  if (liquidityUSD >    100_000) return 0.10   // >$100k:0.10%
+  return 0.50                                   // <$100k: 0.50%
+}
+
+export async function fetchAllDEXPrices(): Promise<DEXPriceRow[]> {
+  const rows: DEXPriceRow[] = []
+
+  for (const [chainKey, config] of Object.entries(MONITOR)) {
+    for (const [addrA, addrB, label] of config.pairs) {
+      const [symA, symB] = label.split('-')
+
+      let pairs: DexScreenerPair[]
+      try {
+        pairs = await fetchPairsFromDexScreener(config.chain, addrA, addrB)
+      } catch (err) {
+        console.warn(`[price-monitor] ${chainKey} ${label}: ${err}`)
+        continue
+      }
+
+      // Deduplicar por dexId: manter o par com mais liquidez
+      const byDex = new Map<string, DexScreenerPair>()
+      for (const p of pairs) {
+        const existing = byDex.get(p.dexId)
+        if (!existing || (p.liquidity?.usd ?? 0) > (existing.liquidity?.usd ?? 0)) {
+          byDex.set(p.dexId, p)
+        }
+      }
+
+      for (const p of byDex.values()) {
+        const liquidityUSD = p.liquidity?.usd ?? 0
+        const slippage     = slippageFromLiquidity(liquidityUSD)
+
+        // Normalizar: garantir sempre tokenA=symA, tokenB=symB
+        const baseIsA = p.baseToken.address.toLowerCase() === addrA.toLowerCase()
+        const priceAtoB = baseIsA ? parseFloat(p.priceNative) : 1 / parseFloat(p.priceNative)
+        const priceBtoA = priceAtoB > 0 ? 1 / priceAtoB : 0
+
+        if (!priceAtoB || isNaN(priceAtoB)) continue
+
+        rows.push({
+          chain:        chainKey,
+          dexName:      p.dexId,
+          tokenA:       symA,
+          tokenB:       symB,
+          priceAtoB,
+          priceBtoA,
+          liquidityUSD,
+          slippage100:  slippage * 0.1,  // $100 → 10x menos slippage que $1000
+          slippage1000: slippage,
+          feeTier:      0,  // DexScreener não expõe fee tier directamente
+          amountIn:     100,
+          amountOut:    priceAtoB * 100,
+        })
+      }
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabaseAdmin.from('DEXPriceSnapshot').insert(
+      rows.map(r => ({ ...r, timestamp: new Date().toISOString() }))
+    )
+    if (error) console.error('[price-monitor] insert error:', error.message)
+  }
+
+  console.log(`[price-monitor] ${rows.length} preços recolhidos de ${new Set(rows.map(r => r.chain)).size} chains`)
+  return rows
+}

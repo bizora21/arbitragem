@@ -1,0 +1,118 @@
+// On-chain contract addresses and minimal ABIs for direct execution via wagmi
+// All addresses are checksummed and verified on each network
+
+import { base, arbitrum, optimism } from 'wagmi/chains'
+
+// ─── Aave V3 Pool ────────────────────────────────────────────────────────────
+export const AAVE_POOL: Record<number, `0x${string}`> = {
+  [base.id]:     '0xA238Dd80C259a72e81d7e4664a9801593F98d1c5',
+  [arbitrum.id]: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+  [optimism.id]: '0x794a61358D6845594F94dc1DB02A252b5b4814aD',
+}
+
+export const AAVE_SUPPLY_ABI = [
+  {
+    name: 'supply', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'asset',        type: 'address' },
+      { name: 'amount',       type: 'uint256' },
+      { name: 'onBehalfOf',   type: 'address' },
+      { name: 'referralCode', type: 'uint16'  },
+    ],
+    outputs: [],
+  },
+] as const
+
+// ─── Compound V3 (cUSDCv3) ───────────────────────────────────────────────────
+export const COMPOUND_COMET: Record<number, `0x${string}`> = {
+  [base.id]:     '0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf',
+  [arbitrum.id]: '0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA',
+}
+
+export const COMPOUND_SUPPLY_ABI = [
+  {
+    name: 'supply', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'asset',  type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+  },
+] as const
+
+// ─── Aerodrome Router (Base) ─────────────────────────────────────────────────
+export const AERODROME_ROUTER = '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43' as const
+
+export const AERODROME_ADD_LIQUIDITY_ABI = [
+  {
+    name: 'addLiquidity', type: 'function', stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenA',        type: 'address' },
+      { name: 'tokenB',        type: 'address' },
+      { name: 'stable',        type: 'bool'    },
+      { name: 'amountADesired',type: 'uint256' },
+      { name: 'amountBDesired',type: 'uint256' },
+      { name: 'amountAMin',    type: 'uint256' },
+      { name: 'amountBMin',    type: 'uint256' },
+      { name: 'to',            type: 'address' },
+      { name: 'deadline',      type: 'uint256' },
+    ],
+    outputs: [
+      { name: 'amountA',    type: 'uint256' },
+      { name: 'amountB',    type: 'uint256' },
+      { name: 'liquidity',  type: 'uint256' },
+    ],
+  },
+] as const
+
+// ─── Uniswap V3 SwapRouter02 ─────────────────────────────────────────────────
+export const UNISWAP_ROUTER: Record<number, `0x${string}`> = {
+  [base.id]:     '0x2626664c2603336E57B271c5C0b26F421741e481',
+  [arbitrum.id]: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
+}
+
+export const UNISWAP_SWAP_ABI = [
+  {
+    name: 'exactInputSingle', type: 'function', stateMutability: 'payable',
+    inputs: [{
+      name: 'params', type: 'tuple',
+      components: [
+        { name: 'tokenIn',           type: 'address' },
+        { name: 'tokenOut',          type: 'address' },
+        { name: 'fee',               type: 'uint24'  },
+        { name: 'recipient',         type: 'address' },
+        { name: 'amountIn',          type: 'uint256' },
+        { name: 'amountOutMinimum',  type: 'uint256' },
+        { name: 'sqrtPriceLimitX96', type: 'uint160' },
+      ],
+    }],
+    outputs: [{ name: 'amountOut', type: 'uint256' }],
+  },
+] as const
+
+// ─── Tokens ───────────────────────────────────────────────────────────────────
+export const USDC: Record<number, `0x${string}`> = {
+  [base.id]:     '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  [arbitrum.id]: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
+  [optimism.id]: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85',
+}
+
+export const USDT: Record<number, `0x${string}`> = {
+  [base.id]:     '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2',
+  [arbitrum.id]: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
+}
+
+export const DAI: Record<number, `0x${string}`> = {
+  [base.id]:     '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
+  [arbitrum.id]: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
+}
+
+export const FRAX: Record<number, `0x${string}`> = {
+  [base.id]:     '0xBB558A58F7F9F7B4Cd4DE6f0d1234f04c37C4f9b' as `0x${string}`,
+  [arbitrum.id]: '0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F',
+}
+
+// Token decimals
+export const TOKEN_DECIMALS: Record<string, number> = {
+  USDC: 6, USDT: 6, DAI: 18, FRAX: 18,
+}

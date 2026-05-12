@@ -8,6 +8,13 @@ const PUBLIC_API_PREFIXES = [
   '/api/opportunities',
   '/api/history',
   '/api/stats',
+  '/api/depeg-monitor',
+  '/api/yield-rates',
+  '/api/cex-dex-spread',
+  '/api/paper-trades',
+  '/api/airdrops',
+  '/api/lp-pools',
+  '/api/analyze-opportunity',
 ]
 
 export async function proxy(request: NextRequest) {

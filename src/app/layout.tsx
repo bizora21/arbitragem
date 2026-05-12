@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'FundingRate Scanner | Arbitrage Dashboard',
-  description: 'Monitor funding rates em tempo real e encontre oportunidades de arbitragem delta-neutral entre OKX, Binance e Bybit.',
-  keywords: ['funding rate', 'arbitrage', 'crypto', 'OKX', 'Binance', 'Bybit', 'perpetual futures'],
+  title: 'Multi-Strategy Survival Scanner',
+  description: 'Monitor funding rates, depegs, yield rotation e CEX-DEX spreads em tempo real.',
+  keywords: ['funding rate', 'arbitrage', 'crypto', 'OKX', 'Binance', 'Bybit', 'DeFi', 'yield'],
 }
 
 export default function RootLayout({
@@ -13,9 +14,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR" className="h-full">
+    <html lang="pt-BR" className="h-full" suppressHydrationWarning>
       <body className="min-h-full gradient-bg text-slate-100 antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

@@ -33,6 +33,14 @@ model Opportunity {
   status             String    @default("ACTIVE")
   createdAt          DateTime  @default(now())
   closedAt           DateTime?
+  feeBreakdown       String?
+  grossEdge          Float?
+  netEdge            Float?
+  capitalMin         Float?
+  capitalOptimal     Float?
+  adjustedReturn     Float?
+  grossReturn        Float?
+  decayFactor        Float?
 
   @@index([status])
   @@index([annualizedReturn])
@@ -83,6 +91,8 @@ model UserSettings {
   alertPush          Boolean  @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+  availableCapital   Float    @default(1000)
+  preferredChain     String   @default("Base")
 }
 
 model FundingRateHistory {
@@ -191,4 +201,86 @@ model ValidationMetrics {
   paperDrawdown   Float
 
   @@index([date])
+}
+
+// ── MULTI-STRATEGY TABLES ─────────────────────────────────────
+
+model DepegEvent {
+  id           String    @id @default(cuid())
+  stablecoin   String
+  exchange     String
+  price        Float
+  deviationPct Float
+  isActive     Boolean   @default(true)
+  detectedAt   DateTime  @default(now())
+  resolvedAt   DateTime?
+
+  @@index([stablecoin, isActive])
+  @@index([detectedAt])
+}
+
+model YieldRate {
+  id                 String   @id @default(cuid())
+  protocol           String
+  chain              String
+  asset              String
+  apy                Float
+  tvl                Float?
+  createdAt          DateTime @default(now())
+  gasCostEstimate    Float?
+  bridgeCostEstimate Float?
+  netAPY             Float?
+  capitalMin         Float?
+
+  @@index([protocol, chain, asset])
+  @@index([createdAt])
+}
+
+model CexDexSpread {
+  id             String   @id @default(cuid())
+  symbol         String
+  cexName        String
+  cexPrice       Float
+  dexName        String
+  dexPrice       Float
+  spreadPct      Float
+  direction      String
+  createdAt      DateTime @default(now())
+  netEdge        Float?
+  grossEdge      Float?
+  feeBreakdown   String?
+  adjustedReturn Float?
+
+  @@index([symbol, spreadPct])
+  @@index([createdAt])
+}
+
+model StrategyAlert {
+  id         String    @id @default(cuid())
+  strategy   String    // FUNDING | DEPEG | YIELD | SPREAD
+  priority   String    // URGENT | HIGH | MEDIUM | LOW
+  title      String
+  detail     String
+  value      String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([strategy, isActive])
+  @@index([priority, isActive])
+  @@index([createdAt])
+}
+
+model ConfidenceScore {
+  id         String   @id @default(cuid())
+  pairKey    String
+  strategy   String
+  score      Float
+  level      String
+  sampleSize Int      @default(0)
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+
+  @@unique([pairKey, strategy])
+  @@index([strategy, score])
 }

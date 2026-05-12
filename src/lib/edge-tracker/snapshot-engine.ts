@@ -2,19 +2,17 @@ import { Exchange, EXCHANGE_FEES, FundingRate } from '@/types'
 import { collectAllFundingRates, groupRatesBySymbol } from '@/lib/analyzer/opportunity-finder'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Slippage estimado por nível de volume (conservador, sem dados reais de volume)
-function estimateSlippage(_volumeUSD: number): number {
-  if (_volumeUSD > 10_000_000) return 0.0001  // 0.01%
-  if (_volumeUSD > 1_000_000)  return 0.0003  // 0.03%
-  return 0.0005                                // 0.05%
+// Slippage estimado pelo volume USDT 24h do par mais fraco (lado constrangedor)
+function estimateSlippage(volumeUSD: number): number {
+  if (volumeUSD > 10_000_000) return 0.0001  // 0.01% — >$10M/dia (BTC, ETH, SOL...)
+  if (volumeUSD > 1_000_000)  return 0.0003  // 0.03% — >$1M/dia
+  return 0.0005                               // 0.05% — <$1M/dia (pares ilíquidos)
 }
 
-// Calcula fees de round-trip para um par de exchanges
+// Fees de round-trip (entrada + saída) em ambas as exchanges
 function estimateFees(exA: Exchange, exB: Exchange): number {
   const feesA = EXCHANGE_FEES[exA]
   const feesB = EXCHANGE_FEES[exB]
-  // Entrada: maker perp em A + maker perp em B
-  // Saída: mesma estrutura
   const entryFees = feesA.perpMaker + feesB.perpMaker
   const exitFees  = feesA.perpMaker + feesB.perpMaker
   return entryFees + exitFees
@@ -36,12 +34,18 @@ export interface SnapshotRow {
   timestamp: Date
 }
 
-// Gera um snapshot de edge para todos os pares disponíveis
 export async function takeSnapshot(): Promise<SnapshotRow[]> {
   const { rates } = await collectAllFundingRates()
   if (rates.length === 0) return []
 
   const grouped = groupRatesBySymbol(rates)
+
+  // Mapa rápido symbol+exchange → volume para lookup O(1)
+  const volumeMap = new Map<string, number>()
+  for (const rate of rates) {
+    volumeMap.set(`${rate.symbol}|${rate.exchange}`, rate.volume24hUSD ?? 0)
+  }
+
   const snapshots: SnapshotRow[] = []
 
   const pairs: [Exchange, Exchange][] = [
@@ -56,10 +60,15 @@ export async function takeSnapshot(): Promise<SnapshotRow[]> {
       const rateB = exchangeRates[exB] as FundingRate | undefined
       if (!rateA || !rateB) continue
 
-      const spreadRaw    = Math.abs(rateA.fundingRate - rateB.fundingRate)
+      const volumeA = rateA.volume24hUSD ?? 0
+      const volumeB = rateB.volume24hUSD ?? 0
+      // Slippage limitado pelo lado menos líquido
+      const constrainingVolume = Math.min(volumeA, volumeB)
+
+      const spreadRaw     = Math.abs(rateA.fundingRate - rateB.fundingRate)
       const feesEstimated = estimateFees(exA, exB)
-      const slippageEst  = estimateSlippage(0) // sem dados de volume reais
-      const edgeNet      = spreadRaw - feesEstimated - slippageEst
+      const slippageEst   = estimateSlippage(constrainingVolume)
+      const edgeNet       = spreadRaw - feesEstimated - slippageEst
 
       snapshots.push({
         symbol:        normalizedSymbol,
@@ -71,14 +80,13 @@ export async function takeSnapshot(): Promise<SnapshotRow[]> {
         feesEstimated,
         slippageEst,
         edgeNet,
-        volumeA24h:    0,
-        volumeB24h:    0,
+        volumeA24h:    volumeA,
+        volumeB24h:    volumeB,
         timestamp:     new Date(),
       })
     }
   }
 
-  // Persiste em batch no Supabase
   if (snapshots.length > 0) {
     const rows = snapshots.map((s) => ({
       symbol:        s.symbol,
@@ -102,7 +110,6 @@ export async function takeSnapshot(): Promise<SnapshotRow[]> {
   return snapshots
 }
 
-// Busca histórico de snapshots das últimas N horas para um símbolo
 export async function getSnapshotHistory(
   symbol: string,
   hours = 24
@@ -123,13 +130,12 @@ export async function getSnapshotHistory(
 
   return (data ?? []).map((r) => ({
     ...r,
-    exchangeA:  r.exchangeA  as Exchange,
-    exchangeB:  r.exchangeB  as Exchange,
-    timestamp:  new Date(r.timestamp),
+    exchangeA: r.exchangeA as Exchange,
+    exchangeB: r.exchangeB as Exchange,
+    timestamp: new Date(r.timestamp),
   }))
 }
 
-// Retorna o count de snapshots hoje
 export async function getSnapshotsToday(): Promise<number> {
   const startOfDay = new Date()
   startOfDay.setUTCHours(0, 0, 0, 0)

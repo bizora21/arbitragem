@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS "PaperTrade" (
   "pnlGross"         DOUBLE PRECISION,
   "pnlNet"           DOUBLE PRECISION,
   "positionSize"     DOUBLE PRECISION NOT NULL,
+  "strategy"         TEXT NOT NULL DEFAULT 'FUNDING',
   "status"           TEXT NOT NULL DEFAULT 'open',
   "closeReason"      TEXT,
   CONSTRAINT "PaperTrade_pkey" PRIMARY KEY ("id")

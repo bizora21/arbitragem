@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  LineChart, Line, BarChart, Bar, ScatterChart, Scatter,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import {
-  Activity, TrendingUp, TrendingDown, Minus,
-  CheckCircle2, XCircle, Clock, RefreshCw, Play,
+  Activity,
+  CheckCircle2, XCircle, RefreshCw, Play,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -251,7 +251,7 @@ export function ValidationDashboard() {
                     <YAxis hide />
                     <Tooltip
                       contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                      formatter={(v: number) => [v, 'count']}
+                      formatter={(v) => [v ?? 0, 'count']}
                       labelFormatter={(l) => `Edge: ${l}%`}
                     />
                     <Bar dataKey="count" radius={[2, 2, 0, 0]}>
@@ -326,7 +326,7 @@ export function ValidationDashboard() {
                       <YAxis hide />
                       <Tooltip
                         contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: number) => [`$${v.toFixed(2)}`, 'Equity']}
+                        formatter={(v) => [typeof v === 'number' ? `$${v.toFixed(2)}` : '$0.00', 'Equity']}
                       />
                       <Line
                         type="monotone" dataKey="equity" stroke="#3b82f6"

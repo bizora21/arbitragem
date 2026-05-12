@@ -12,6 +12,11 @@ interface OKXFundingRateItem {
   realizedRate?: string
 }
 
+interface OKXTickerItem {
+  instId: string
+  volCcy24h: string  // volume em moeda cotada (USDT para pares USDT)
+}
+
 interface OKXMarkPriceItem {
   instId: string
   markPx: string
@@ -32,31 +37,33 @@ interface OKXResponse<T> {
   data: T[]
 }
 
+interface OKXTickerSwap {
+  instId:       string
+  fundingRate:  string
+  nextFundingTime: string
+  volCcy24h:    string  // volume em USDT para pares USDT-SWAP
+}
+
 export async function getOKXFundingRates(): Promise<FundingRate[]> {
-  const url = `${BASE_URL}/public/funding-rate-all?instType=SWAP`
+  // /market/tickers?instType=SWAP devolve fundingRate + volume numa única chamada
+  const res = await safeFetch(`${BASE_URL}/market/tickers?instType=SWAP`)
+  if (!res.ok) throw new Error(`OKX API error: ${res.status} ${res.statusText}`)
 
-  const response = await safeFetch(url)
-  if (!response.ok) {
-    throw new Error(`OKX API error: ${response.status} ${response.statusText}`)
-  }
-
-  const json: OKXResponse<OKXFundingRateItem> = await response.json()
-
-  if (json.code !== '0') {
-    throw new Error(`OKX API error: ${json.msg}`)
-  }
+  const json: OKXResponse<OKXTickerSwap> = await res.json()
+  if (json.code !== '0') throw new Error(`OKX API error: ${json.msg}`)
 
   return json.data
-    .filter((item) => item.instId.endsWith('-USDT-SWAP'))
+    .filter((item) => item.instId.endsWith('-USDT-SWAP') && item.fundingRate !== '')
     .map((item) => ({
-      symbol: item.instId,
-      exchange: 'OKX' as const,
-      fundingRate: parseFloat(item.fundingRate),
-      markPrice: null,
-      indexPrice: null,
-      nextFundingTime: item.nextFundingTime ? new Date(parseInt(item.nextFundingTime)) : null,
-      timestamp: new Date(),
+      symbol:           item.instId,
+      exchange:         'OKX' as const,
+      fundingRate:      parseFloat(item.fundingRate) || 0,
+      markPrice:        null,
+      indexPrice:       null,
+      nextFundingTime:  item.nextFundingTime ? new Date(parseInt(item.nextFundingTime)) : null,
+      timestamp:        new Date(),
       normalizedSymbol: normalizeSymbol(item.instId, 'OKX'),
+      volume24hUSD:     parseFloat(item.volCcy24h) || 0,
     }))
 }
 

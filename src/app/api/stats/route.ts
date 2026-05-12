@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { findOpportunities } from '@/lib/analyzer/opportunity-finder'
-import { getLatestFundingRates } from '@/lib/analyzer/opportunity-finder'
+import { findOpportunities, getLatestFundingRates } from '@/lib/analyzer/opportunity-finder'
 import { mean } from '@/lib/utils'
+import { calculateFeeBreakdown, calculateNetEdge } from '@/lib/strategies/fee-engine'
+import { calculateFundingReturnSync } from '@/lib/strategies/return-calculator'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -9,7 +10,7 @@ export const revalidate = 0
 export async function GET() {
   try {
     const [opportunities, rates] = await Promise.allSettled([
-      findOpportunities(5),
+      findOpportunities(1000),
       getLatestFundingRates(),
     ])
 
@@ -20,11 +21,36 @@ export async function GET() {
       ? Math.max(...opps.map((o) => o.annualizedReturn))
       : 0
 
+    // Compute net returns and fee impact
+    const netReturns = opps.map((o) => {
+      const est = calculateFundingReturnSync(o.fundingRateDiff)
+      const fees = calculateFeeBreakdown({
+        strategy: 'FUNDING',
+        capital: 1000,
+        exchanges: [o.buyExchange, o.sellExchange],
+      })
+      const grossEdge = 1000 * o.fundingRateDiff
+      return {
+        netEdge: calculateNetEdge(grossEdge, fees),
+        grossReturn: est.grossReturn,
+        adjustedReturn: est.adjustedReturn,
+        feeTotal: fees.totalFees,
+        grossEdge,
+      }
+    })
+
+    const bestNetReturn = netReturns.length > 0
+      ? Math.max(...netReturns.map((r) => r.adjustedReturn))
+      : 0
+
+    const avgFeeImpact = netReturns.length > 0
+      ? mean(netReturns.map((r) => r.feeTotal / Math.max(r.grossEdge, 0.01) * 100))
+      : 0
+
     const avgFunding = ratesList.length > 0
       ? mean(ratesList.map((r) => r.fundingRate))
       : 0
 
-    // Next funding: most common next funding time
     const nextFundingTimes = ratesList
       .map((r) => r.nextFundingTime)
       .filter(Boolean) as Date[]
@@ -40,6 +66,8 @@ export async function GET() {
       data: {
         totalOpportunities: opps.length,
         bestAnnualizedReturn: bestReturn,
+        bestNetReturn,
+        avgFeeImpact,
         avgFundingRate: avgFunding,
         nextFundingIn,
         activePositions: 0,

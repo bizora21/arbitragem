@@ -65,6 +65,7 @@ export async function getBybitFundingRates(): Promise<FundingRate[]> {
         : null,
       timestamp: new Date(),
       normalizedSymbol: item.symbol,
+      volume24hUSD: parseFloat(item.turnover24h) || 0,
     }))
 }
 

@@ -21,6 +21,7 @@ export interface FundingRate {
   indexPrice: number | null
   nextFundingTime: Date | null
   timestamp: Date
+  volume24hUSD?: number  // volume em USDT nas últimas 24h (para cálculo de slippage)
 }
 
 // Normalized funding rate with symbol mapped

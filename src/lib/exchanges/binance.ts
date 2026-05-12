@@ -14,6 +14,11 @@ interface BinancePremiumIndex {
   time: number
 }
 
+interface BinanceTicker24h {
+  symbol: string
+  quoteVolume: string  // volume em USDT
+}
+
 interface BinanceFundingRateItem {
   symbol: string
   fundingRate: string
@@ -22,17 +27,27 @@ interface BinanceFundingRateItem {
 }
 
 export async function getBinanceFundingRates(): Promise<FundingRate[]> {
-  // premiumIndex returns all symbols with current funding rate
-  const url = `${BASE_URL}/premiumIndex`
+  const [premiumRes, tickerRes] = await Promise.allSettled([
+    safeFetch(`${BASE_URL}/premiumIndex`),
+    safeFetch(`${BASE_URL}/ticker/24hr`),
+  ])
 
-  const response = await safeFetch(url)
-  if (!response.ok) {
-    throw new Error(`Binance API error: ${response.status} ${response.statusText}`)
+  if (premiumRes.status === 'rejected' || !premiumRes.value.ok) {
+    throw new Error(`Binance API error: ${premiumRes.status === 'rejected' ? premiumRes.reason : premiumRes.value.statusText}`)
   }
 
-  const data: BinancePremiumIndex[] = await response.json()
+  const premiumData: BinancePremiumIndex[] = await premiumRes.value.json()
 
-  return data
+  // Mapa symbol → quoteVolume (USDT)
+  const volumeMap: Record<string, number> = {}
+  if (tickerRes.status === 'fulfilled' && tickerRes.value.ok) {
+    const tickerData: BinanceTicker24h[] = await tickerRes.value.json()
+    for (const t of tickerData) {
+      volumeMap[t.symbol] = parseFloat(t.quoteVolume) || 0
+    }
+  }
+
+  return premiumData
     .filter((item) => item.symbol.endsWith('USDT'))
     .map((item) => ({
       symbol: item.symbol,
@@ -43,6 +58,7 @@ export async function getBinanceFundingRates(): Promise<FundingRate[]> {
       nextFundingTime: item.nextFundingTime ? new Date(item.nextFundingTime) : null,
       timestamp: new Date(item.time),
       normalizedSymbol: item.symbol,
+      volume24hUSD: volumeMap[item.symbol] ?? 0,
     }))
 }
 

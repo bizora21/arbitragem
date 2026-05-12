@@ -1,22 +1,23 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PrismaClient } = require('@prisma/client') as typeof import('@/generated/prisma')
-import { PrismaPg } from '@prisma/adapter-pg'
+// Prisma client — apenas disponível depois de `npx prisma generate`
+// Todas as operações de runtime usam supabaseAdmin (REST/HTTPS).
+// Este módulo é reservado para uso local/CLI.
 
-type PC = InstanceType<typeof PrismaClient>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _prisma: any = null
 
-const globalForPrisma = globalThis as unknown as { prisma: PC | undefined }
-
-function createClient(): PC {
-  const url = process.env.DATABASE_URL
-  if (!url) {
-    console.warn('[db] DATABASE_URL not set – DB ops will fail at runtime')
-    return new PrismaClient()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function getPrisma(): any {
+  if (!_prisma) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PrismaClient } = require('@prisma/client')
+      _prisma = new PrismaClient()
+    } catch {
+      console.warn('[db] @prisma/client não disponível — corre npx prisma generate')
+    }
   }
-  const adapter = new PrismaPg(url)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return new PrismaClient({ adapter: adapter as any })
+  return _prisma
 }
 
-export const prisma: PC = globalForPrisma.prisma ?? createClient()
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+export const prisma = getPrisma()
 export default prisma
