@@ -168,7 +168,19 @@ async function collectSnapshots() {
   if (snapshots.length === 0) return { count: 0, positiveEdge: 0 }
 
   const { error } = await supabase.from('EdgeSnapshot').insert(snapshots)
-  if (error) throw new Error(`Supabase insert falhou: ${error.message}`)
+  if (error) {
+    if (error.code === '42P01') {
+      console.warn('⚠️  Tabela EdgeSnapshot não encontrada — as migrations SQL ainda não foram executadas.')
+      console.warn('    Solução: Supabase Dashboard → SQL Editor → colar e executar:')
+      console.warn('    supabase/migrations/edge_validator_tables.sql')
+    } else {
+      console.warn(`⚠️  Supabase insert falhou (${error.code}): ${error.message}`)
+    }
+    console.warn(`    Snapshot gerado com ${snapshots.length} linhas — não persistido.`)
+    const positiveEdge = snapshots.filter(s => s.edgeNet > 0).length
+    console.warn(`    Resumo: ${snapshots.length} snapshots | ${positiveEdge} com edge positivo`)
+    return { count: 0, positiveEdge: 0, grouped: {}, snapshots: [] }
+  }
 
   const positiveEdge = snapshots.filter(s => s.edgeNet > 0).length
   return { count: snapshots.length, positiveEdge, grouped, snapshots }
@@ -176,11 +188,18 @@ async function collectSnapshots() {
 
 // ─── Tracking de persistência ──────────────────────────────────────────────
 async function trackNewOpportunities(snapshots) {
+  if (!snapshots || snapshots.length === 0) return 0
+
   // Conta oportunidades não resolvidas
-  const { count } = await supabase
+  const { count, error: countErr } = await supabase
     .from('OpportunityLife')
     .select('*', { count: 'exact', head: true })
     .eq('resolved', false)
+
+  if (countErr) {
+    console.warn(`⚠️  OpportunityLife inacessível (${countErr.code}) — tracking ignorado.`)
+    return 0
+  }
 
   let available = MAX_TRACKED - (count ?? 0)
   if (available <= 0) return 0
@@ -220,13 +239,20 @@ async function trackNewOpportunities(snapshots) {
 }
 
 async function checkPersistence(grouped) {
+  if (!grouped || Object.keys(grouped).length === 0) return 0
+
   const now = Date.now()
 
-  const { data: pending } = await supabase
+  const { data: pending, error: fetchErr } = await supabase
     .from('OpportunityLife')
     .select('*')
     .eq('resolved', false)
     .limit(MAX_TRACKED)
+
+  if (fetchErr) {
+    console.warn(`⚠️  OpportunityLife inacessível (${fetchErr.code}) — verificação de persistência ignorada.`)
+    return 0
+  }
 
   if (!pending || pending.length === 0) return 0
 
