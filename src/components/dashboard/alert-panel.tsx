@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, BellOff, X, RefreshCw } from 'lucide-react'
 
-type Strategy = 'FUNDING' | 'DEPEG' | 'YIELD' | 'SPREAD'
+type Strategy = 'FUNDING' | 'DEPEG' | 'YIELD' | 'SPREAD' | 'AIRDROP'
 type Filter = 'ALL' | Strategy
 type Priority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW'
 
@@ -28,6 +28,7 @@ const STRATEGY_META: Record<Strategy, { icon: string; label: string }> = {
   DEPEG:   { icon: '🛡️', label: 'Depeg'  },
   YIELD:   { icon: '🌿', label: 'Yield'  },
   SPREAD:  { icon: '🔗', label: 'Spread' },
+  AIRDROP: { icon: '🪂', label: 'Airdrop' },
 }
 
 function buildAlerts(
@@ -35,6 +36,7 @@ function buildAlerts(
   depeg:     { stablecoins?: any[] } | null,
   yieldData: { opportunities?: any[] } | null,
   spread:    { alerts?: any[] } | null,
+  airdrops:  { data?: any[] } | null,
 ): LiveAlert[] {
   const alerts: LiveAlert[] = []
   let n = 0
@@ -93,6 +95,19 @@ function buildAlerts(
     }
   }
 
+  if (airdrops?.data) {
+    for (const a of airdrops.data) {
+      if (a.tier !== 'S' && a.tier !== 'A') continue
+      const priority: Priority = a.tier === 'S' ? 'HIGH' : 'MEDIUM'
+      alerts.push({
+        id: `air${n++}`, strategy: 'AIRDROP', priority,
+        title: `${a.protocol} — Tier ${a.tier}`,
+        detail: `${a.chain} · ${a.category ?? 'DeFi'} · sem token`,
+        value: a.tvl ? `TVL $${(a.tvl / 1_000_000).toFixed(0)}M` : undefined,
+      })
+    }
+  }
+
   return alerts.sort((a, b) => PRIORITY_CONFIG[a.priority].order - PRIORITY_CONFIG[b.priority].order)
 }
 
@@ -106,18 +121,20 @@ export function AlertPanel({ onClose }: { onClose?: () => void }) {
   const fetchAlerts = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true)
 
-    const [f, d, y, s] = await Promise.allSettled([
+    const [f, d, y, s, air] = await Promise.allSettled([
       fetch('/api/opportunities?capital=5&limit=50').then((r) => r.json()),
       fetch('/api/depeg-monitor').then((r) => r.json()),
       fetch('/api/yield-rates').then((r) => r.json()),
       fetch('/api/cex-dex-spread').then((r) => r.json()),
+      fetch('/api/airdrops').then((r) => r.json()),
     ])
 
     setAlerts(buildAlerts(
-      f.status === 'fulfilled' ? f.value : null,
-      d.status === 'fulfilled' ? d.value : null,
-      y.status === 'fulfilled' ? y.value : null,
-      s.status === 'fulfilled' ? s.value : null,
+      f.status   === 'fulfilled' ? f.value   : null,
+      d.status   === 'fulfilled' ? d.value   : null,
+      y.status   === 'fulfilled' ? y.value   : null,
+      s.status   === 'fulfilled' ? s.value   : null,
+      air.status === 'fulfilled' ? air.value : null,
     ))
     setLastUpdate(new Date())
     setLoading(false)
@@ -138,6 +155,7 @@ export function AlertPanel({ onClose }: { onClose?: () => void }) {
     DEPEG:   active.filter((a) => a.strategy === 'DEPEG').length,
     YIELD:   active.filter((a) => a.strategy === 'YIELD').length,
     SPREAD:  active.filter((a) => a.strategy === 'SPREAD').length,
+    AIRDROP: active.filter((a) => a.strategy === 'AIRDROP').length,
   }
 
   return (
@@ -174,7 +192,7 @@ export function AlertPanel({ onClose }: { onClose?: () => void }) {
 
       {/* Strategy filter tabs */}
       <div className="flex gap-1 px-2 py-2 border-b border-slate-700/30 overflow-x-auto scrollbar-none flex-shrink-0">
-        {(['ALL', 'FUNDING', 'DEPEG', 'YIELD', 'SPREAD'] as Filter[]).map((f) => (
+        {(['ALL', 'AIRDROP', 'YIELD', 'DEPEG', 'FUNDING', 'SPREAD'] as Filter[]).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
