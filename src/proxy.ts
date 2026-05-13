@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-const PUBLIC_PAGES = ['/login', '/auth/callback', '/auth/confirm']
+const PUBLIC_PAGES = ['/', '/login', '/auth/callback', '/auth/confirm']
 
 const PUBLIC_API_PREFIXES = [
   '/api/funding-rates',
@@ -40,19 +40,13 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // APIs privadas sem sessão → 401
+  // Todas as APIs são públicas — autenticação feita via MetaMask on-chain
   if (pathname.startsWith('/api/')) {
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Não autenticado', timestamp: new Date().toISOString() },
-        { status: 401 }
-      )
-    }
     return response
   }
 
-  // Páginas privadas sem sessão → /login
-  if (!user) {
+  // Páginas privadas sem sessão → /login (apenas settings)
+  if (!user && pathname.startsWith('/settings')) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
