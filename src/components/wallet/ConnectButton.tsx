@@ -13,7 +13,7 @@ const CHAINS = [
   { id: optimism.id, name: 'Optimism', short: 'OP',   color: 'bg-red-500'  },
 ]
 
-const SUPPORTED_IDS = new Set(CHAINS.map((c) => c.id))
+const isSupportedChain = (id: number) => CHAINS.some((c) => c.id === id)
 
 export function ConnectButton() {
   const [mounted, setMounted]       = useState(false)
@@ -39,7 +39,7 @@ export function ConnectButton() {
 
   const truncated  = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : ''
   const currentChain = CHAINS.find((c) => c.id === chain?.id)
-  const unsupported  = isConnected && chain && !SUPPORTED_IDS.has(chain.id)
+  const unsupported  = isConnected && chain && !isSupportedChain(chain.id)
   const connector    = connectors[0]
 
   if (!mounted) return <div className="w-28 h-7 bg-slate-700/50 rounded-lg animate-pulse" />
