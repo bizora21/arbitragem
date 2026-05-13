@@ -6,6 +6,7 @@ import { StrategyValidationPanel } from './strategy-validation-panel'
 import { CapitalBadge } from '@/components/CapitalBadge'
 import { ReturnSimulator } from '@/components/ReturnSimulator'
 import { MyPositions } from './my-positions'
+import { CompoundingCalculator } from '@/components/CompoundingCalculator'
 
 interface YieldPool {
   protocol: string
@@ -460,6 +461,9 @@ export function YieldTab() {
               <p className="text-[11px] text-slate-500 mt-0.5">{opps.length} rotações disponíveis</p>
             </div>
           </div>
+
+          {/* Compounding calculator */}
+          <CompoundingCalculator defaultApy={bestAPY} strategyName="Yield" />
 
           {/* Sub-tabs + asset filter */}
           <div className="flex items-center justify-between flex-wrap gap-2">

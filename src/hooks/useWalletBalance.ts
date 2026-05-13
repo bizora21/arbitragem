@@ -12,20 +12,20 @@ const USDC: Record<number, `0x${string}`> = {
   [bsc.id]:      '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // 18 decimals on BSC
 }
 
-// USDT on BSC (18 decimals)
-const USDT_BSC = '0x55d398326f99059fF775485246999027B3197955' as `0x${string}`
-
-// Static prices — good enough for balance display
-const ETH_USD = 3000
-const BNB_USD = 600
-const MATIC_USD = 0.5
+const USDT: Record<number, `0x${string}`> = {
+  [mainnet.id]:  '0xdAC17F958D2ee523a2206206994597C13D831ec7', // 6 decimals
+  [base.id]:     '0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2', // 6 decimals
+  [arbitrum.id]: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', // 6 decimals
+  [optimism.id]: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58', // 6 decimals
+  [bsc.id]:      '0x55d398326f99059fF775485246999027B3197955', // 18 decimals
+}
 
 const NATIVE_PRICE: Record<number, number> = {
-  [mainnet.id]:  ETH_USD,
-  [base.id]:     ETH_USD,
-  [arbitrum.id]: ETH_USD,
-  [optimism.id]: ETH_USD,
-  [bsc.id]:      BNB_USD,
+  [mainnet.id]:  3000,
+  [base.id]:     3000,
+  [arbitrum.id]: 3000,
+  [optimism.id]: 3000,
+  [bsc.id]:      600,
 }
 
 export interface ChainBalance {
@@ -34,8 +34,10 @@ export interface ChainBalance {
   nativeSymbol: string
   nativeBalance: string
   usdcBalance: string
+  usdtBalance: string
   nativeUsd: number
   usdcUsd: number
+  usdtUsd: number
   totalUsd: number
 }
 
@@ -46,6 +48,33 @@ function fmt(value: bigint | undefined, decimals: number): string {
 
 function toNum(s: string): number {
   return parseFloat(s) || 0
+}
+
+function buildChain(
+  name: string,
+  chainId: number,
+  nativeSymbol: string,
+  nativeBig: bigint | undefined,
+  usdcBig: bigint | undefined,
+  usdtBig: bigint | undefined,
+  usdcDecimals = 6,
+  usdtDecimals = 6,
+): ChainBalance {
+  const nativeFmt = fmt(nativeBig, 18)
+  const usdcFmt   = fmt(usdcBig, usdcDecimals)
+  const usdtFmt   = fmt(usdtBig, usdtDecimals)
+  const price     = NATIVE_PRICE[chainId] ?? 3000
+  const nativeUsd = toNum(nativeFmt) * price
+  const usdcUsd   = toNum(usdcFmt)
+  const usdtUsd   = toNum(usdtFmt)
+  return {
+    name, chainId, nativeSymbol,
+    nativeBalance: nativeFmt,
+    usdcBalance: usdcFmt,
+    usdtBalance: usdtFmt,
+    nativeUsd, usdcUsd, usdtUsd,
+    totalUsd: nativeUsd + usdcUsd + usdtUsd,
+  }
 }
 
 export function useWalletBalance() {
@@ -64,54 +93,29 @@ export function useWalletBalance() {
   const usdcArb   = useReadContract({ address: USDC[arbitrum.id], abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: arbitrum.id, query: { enabled } })
   const usdcOpt   = useReadContract({ address: USDC[optimism.id], abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: optimism.id, query: { enabled } })
   const usdcMain  = useReadContract({ address: USDC[mainnet.id],  abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: mainnet.id,  query: { enabled } })
-  // BSC: USDC has 18 decimals; also read USDT as fallback
-  const usdcBsc   = useReadContract({ address: USDC[bsc.id],  abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: bsc.id, query: { enabled } })
-  const usdtBsc   = useReadContract({ address: USDT_BSC,       abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: bsc.id, query: { enabled } })
+  const usdcBsc   = useReadContract({ address: USDC[bsc.id],      abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: bsc.id,      query: { enabled } })
 
-  function buildChain(
-    name: string,
-    chainId: number,
-    nativeSymbol: string,
-    nativeBig: bigint | undefined,
-    usdcBig: bigint | undefined,
-    usdcDecimals = 6,
-  ): ChainBalance {
-    const nativeFmt = fmt(nativeBig, 18)
-    const usdcFmt   = fmt(usdcBig, usdcDecimals)
-    const price     = NATIVE_PRICE[chainId] ?? ETH_USD
-    const nativeUsd = toNum(nativeFmt) * price
-    const usdcUsd   = toNum(usdcFmt)
-    return { name, chainId, nativeSymbol, nativeBalance: nativeFmt, usdcBalance: usdcFmt, nativeUsd, usdcUsd, totalUsd: nativeUsd + usdcUsd }
-  }
-
-  // BSC: combine USDC + USDT (both 18 decimals)
-  const bscUsdcBig = usdcBsc.data as bigint | undefined
-  const bscUsdtBig = usdtBsc.data as bigint | undefined
-  const bscStableUsd = toNum(fmt(bscUsdcBig, 18)) + toNum(fmt(bscUsdtBig, 18))
-  const bscNativeFmt = fmt(natBsc.data?.value, 18)
-  const bscNativeUsd = toNum(bscNativeFmt) * BNB_USD
+  // USDT per chain
+  const usdtBase  = useReadContract({ address: USDT[base.id],     abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: base.id,     query: { enabled } })
+  const usdtArb   = useReadContract({ address: USDT[arbitrum.id], abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: arbitrum.id, query: { enabled } })
+  const usdtOpt   = useReadContract({ address: USDT[optimism.id], abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: optimism.id, query: { enabled } })
+  const usdtMain  = useReadContract({ address: USDT[mainnet.id],  abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: mainnet.id,  query: { enabled } })
+  const usdtBsc   = useReadContract({ address: USDT[bsc.id],      abi: erc20Abi, functionName: 'balanceOf', args: [address!], chainId: bsc.id,      query: { enabled } })
 
   const chains: ChainBalance[] = [
-    buildChain('Base',     base.id,     'ETH',  natBase.data?.value, usdcBase.data as bigint | undefined),
-    buildChain('Arbitrum', arbitrum.id, 'ETH',  natArb.data?.value,  usdcArb.data  as bigint | undefined),
-    buildChain('Optimism', optimism.id, 'ETH',  natOpt.data?.value,  usdcOpt.data  as bigint | undefined),
-    buildChain('Ethereum', mainnet.id,  'ETH',  natMain.data?.value, usdcMain.data as bigint | undefined),
-    {
-      name: 'BSC',
-      chainId: bsc.id,
-      nativeSymbol: 'BNB',
-      nativeBalance: bscNativeFmt,
-      usdcBalance: fmt(bscUsdcBig, 18),
-      nativeUsd: bscNativeUsd,
-      usdcUsd: bscStableUsd,
-      totalUsd: bscNativeUsd + bscStableUsd,
-    },
+    buildChain('Base',     base.id,     'ETH', natBase.data?.value,  usdcBase.data as bigint | undefined,  usdtBase.data as bigint | undefined),
+    buildChain('Arbitrum', arbitrum.id, 'ETH', natArb.data?.value,   usdcArb.data  as bigint | undefined,  usdtArb.data  as bigint | undefined),
+    buildChain('Optimism', optimism.id, 'ETH', natOpt.data?.value,   usdcOpt.data  as bigint | undefined,  usdtOpt.data  as bigint | undefined),
+    buildChain('Ethereum', mainnet.id,  'ETH', natMain.data?.value,  usdcMain.data as bigint | undefined,  usdtMain.data as bigint | undefined),
+    // BSC: both tokens use 18 decimals
+    buildChain('BSC',      bsc.id,      'BNB', natBsc.data?.value,   usdcBsc.data  as bigint | undefined,  usdtBsc.data  as bigint | undefined, 18, 18),
   ]
 
   const totalUsd      = chains.reduce((s, c) => s + c.totalUsd, 0)
   const totalUsdc     = chains.reduce((s, c) => s + c.usdcUsd, 0)
+  const totalUsdt     = chains.reduce((s, c) => s + c.usdtUsd, 0)
   const totalNativeUsd = chains.reduce((s, c) => s + c.nativeUsd, 0)
-  const isLoading     = natBase.isLoading || usdcBase.isLoading
+  const isLoading     = natBase.isLoading || usdcBase.isLoading || usdtBase.isLoading
 
-  return { address, chains, totalUsd, totalUsdc, totalEthUsd: totalNativeUsd, isLoading }
+  return { address, chains, totalUsd, totalUsdc, totalUsdt, totalEthUsd: totalNativeUsd, isLoading }
 }

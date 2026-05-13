@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Clock, Layers, Brain, ExternalLink, Zap, Eye, AlertTriangle, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react'
 import { LPExecutePanel } from './lp-execute-panel'
+import { CompoundingCalculator } from '@/components/CompoundingCalculator'
 import { useAccount } from 'wagmi'
 
 interface LPPool {
@@ -411,6 +412,9 @@ export function LPTab() {
           <p className="text-[11px] text-emerald-500/80 mt-0.5">Aerodrome Base via MetaMask</p>
         </div>
       </div>
+
+      {/* ── Compounding calculator ── */}
+      <CompoundingCalculator defaultApy={bestAPY} strategyName="LP" />
 
       {/* ── Legend ── */}
       <div className="flex items-center gap-4 text-[11px] text-slate-500 bg-slate-800/30 border border-slate-700/30 rounded-lg px-3 py-2">
