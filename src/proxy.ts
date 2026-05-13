@@ -15,6 +15,10 @@ const PUBLIC_API_PREFIXES = [
   '/api/airdrops',
   '/api/lp-pools',
   '/api/analyze-opportunity',
+  '/api/validation',
+  '/api/positions',
+  '/api/alerts',
+  '/api/analyze',
 ]
 
 export async function proxy(request: NextRequest) {

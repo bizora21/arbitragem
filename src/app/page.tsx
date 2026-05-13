@@ -7,6 +7,7 @@ import { YieldTab } from '@/components/dashboard/yield-tab'
 import { SpreadTab } from '@/components/dashboard/spread-tab'
 import { AirdropTab } from '@/components/dashboard/airdrop-tab'
 import { LPTab } from '@/components/dashboard/lp-tab'
+import { ValidationDashboard } from '@/components/dashboard/validation-dashboard'
 import { AlertPanel } from '@/components/dashboard/alert-panel'
 import { StatsBar } from '@/components/dashboard/stats-bar'
 import { UserMenu } from '@/components/auth/user-menu'
@@ -16,7 +17,7 @@ import { WalletBalance } from '@/components/wallet/WalletBalance'
 import { useUser } from '@/hooks/use-user'
 import { Bell } from 'lucide-react'
 
-type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread'
+type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread' | 'validation'
 
 const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
   {
@@ -54,6 +55,12 @@ const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
     label: 'CEX-DEX Spread',
     emoji: '🔗',
     description: 'Binance · OKX vs Uniswap V3 · $5k+',
+  },
+  {
+    id: 'validation',
+    label: 'Validação',
+    emoji: '📊',
+    description: 'Edge Tracker · Persistência · Paper Trades · Veredicto GO/NO-GO',
   },
 ]
 
@@ -141,7 +148,8 @@ export default function DashboardPage() {
           {activeTab === 'yield'    && <YieldTab />}
           {activeTab === 'depeg'    && <DepegTab />}
           {activeTab === 'funding'  && <FundingTab />}
-          {activeTab === 'spread'   && <SpreadTab />}
+          {activeTab === 'spread'     && <SpreadTab />}
+          {activeTab === 'validation' && <ValidationDashboard />}
         </main>
 
         <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 bg-slate-900/60 border border-slate-700/50 rounded-xl sticky top-24 max-h-[calc(100vh-7rem)] overflow-hidden">
