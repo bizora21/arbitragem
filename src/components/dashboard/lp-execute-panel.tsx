@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
+import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
 import { parseUnits, formatUnits, erc20Abi } from 'viem'
 import { base, bsc } from 'wagmi/chains'
 import { Droplets, CheckCircle, AlertTriangle, Loader2, ExternalLink, ArrowRight, GitMerge } from 'lucide-react'
@@ -38,6 +38,12 @@ export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: numbe
   const isOnBase = chainId === base.id
   const isOnBsc  = chainId === bsc.id
   const enabled  = isConnected && !!address && isOnBase
+
+  // ETH balance on Base for gas check
+  const { data: ethBalRaw } = useBalance({ address, chainId: base.id, query: { enabled: isConnected && !!address } })
+  const ethBalance  = ethBalRaw ? parseFloat(formatUnits(ethBalRaw.value, 18)) : 0
+  const ETH_MIN_GAS = 0.0005          // ~$1.50 — enough for 3 Base txs
+  const hasGas      = ethBalance >= ETH_MIN_GAS
 
   const amountABig = parseUnits(amountA || '0', pair.tokenA.decimals)
   const amountBBig = parseUnits(amountA || '0', pair.tokenB.decimals) // equal value for stable pairs
@@ -394,15 +400,59 @@ export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: numbe
         </div>
       )}
 
+      {/* ── Gas warning ── */}
+      {isOnBase && !hasGas && step === 'idle' && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-red-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            ETH insuficiente para gas — saldo actual: {ethBalance.toFixed(6)} ETH
+          </p>
+          <p className="text-xs text-slate-400">
+            A rede Base usa ETH como taxa de rede. Cada transação custa ~$0.01–0.10.
+            Para 3 transações (aprovar USDC, aprovar USDT, depositar) precisas de pelo menos{' '}
+            <span className="text-white font-medium">0.001 ETH (~$3)</span>.
+          </p>
+          <p className="text-xs font-semibold text-slate-300 mt-1">Como obter ETH na Base:</p>
+          <ol className="space-y-1">
+            {[
+              'Melhor opção: Levanta ETH da Coinbase → endereço Base (levantamento gratuito para Base)',
+              'Ou: compra ETH na MetaMask (botão "Buy") e seleciona rede Base',
+              'Ou: faz bridge de ETH de outra rede em stargate.finance (BSC → Base)',
+              'Quantidade necessária: apenas $3–5 de ETH chega para muitas transações',
+            ].map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                <span className="shrink-0 w-4 h-4 rounded-full bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
+                {s}
+              </li>
+            ))}
+          </ol>
+          <div className="flex gap-2 pt-1 flex-wrap">
+            <a href="https://stargate.finance/transfer" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-600/20 border border-red-500/40 text-red-300 hover:bg-red-600/30 rounded-lg transition-colors">
+              <ExternalLink className="w-3 h-3" /> Stargate — bridge ETH para Base
+            </a>
+            <a href="https://bridge.base.org/deposit" target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors">
+              <ExternalLink className="w-3 h-3" /> Base Bridge oficial
+            </a>
+          </div>
+        </div>
+      )}
+
       <button onClick={step === 'error' ? reset : handleExecute}
-        disabled={isProcessing || !isOnBase || !amountA || amountNum <= 0 || amountNum > Math.min(balanceA, balanceB)}
+        disabled={isProcessing || !isOnBase || !hasGas || !amountA || amountNum <= 0 || amountNum > Math.min(balanceA, balanceB)}
         className="w-full py-3 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-all">
         {isProcessing
           ? <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{stepLabel}</span>
           : step === 'error' ? 'Tentar novamente'
+          : !hasGas ? 'ETH insuficiente para gas'
           : `Adicionar $${amountA || '0'} + $${amountA || '0'} em ${pair.label}`}
       </button>
-      <p className="text-[10px] text-slate-600 text-center">3 confirmações MetaMask · Nunca sais da ferramenta</p>
+      <p className="text-[10px] text-slate-600 text-center flex items-center justify-center gap-2">
+        <span>Gas Base: ~$0.01–0.10 por tx</span>
+        <span>·</span>
+        <span>ETH disponível: {ethBalance.toFixed(5)}</span>
+      </p>
     </div>
   )
 }
