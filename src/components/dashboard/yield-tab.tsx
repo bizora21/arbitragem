@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, AlertCircle, ArrowRight, Brain, ExternalLink, Zap, Eye, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw, AlertCircle, ArrowRight, Brain, ExternalLink, Zap, Eye, AlertTriangle, ChevronDown, ChevronUp, TrendingUp, Clock } from 'lucide-react'
 import { StrategyValidationPanel } from './strategy-validation-panel'
 import { CapitalBadge } from '@/components/CapitalBadge'
 import { ReturnSimulator } from '@/components/ReturnSimulator'
-import { ExecutePanel } from './execute-panel'
 import { MyPositions } from './my-positions'
 
 interface YieldPool {
@@ -61,12 +60,11 @@ const ASSET_COLORS: Record<string, string> = {
 }
 
 const REC_STYLES: Record<string, { bg: string; text: string; border: string; icon: React.ReactNode; label: string }> = {
-  ENTER: { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/40', icon: <Zap className="w-3.5 h-3.5" />, label: 'ENTRAR' },
-  WATCH: { bg: 'bg-yellow-500/10',  text: 'text-yellow-300',  border: 'border-yellow-500/40',  icon: <Eye className="w-3.5 h-3.5" />, label: 'OBSERVAR' },
-  SKIP:  { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/40',      icon: <AlertTriangle className="w-3.5 h-3.5" />, label: 'IGNORAR' },
+  ENTER: { bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/40', icon: <Zap className="w-3.5 h-3.5" />,         label: 'ENTRAR'   },
+  WATCH: { bg: 'bg-yellow-500/10',  text: 'text-yellow-300',  border: 'border-yellow-500/40',  icon: <Eye className="w-3.5 h-3.5" />,          label: 'OBSERVAR' },
+  SKIP:  { bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/40',      icon: <AlertTriangle className="w-3.5 h-3.5" />, label: 'IGNORAR'  },
 }
 
-// Direct protocol links
 const PROTOCOL_LINKS: Record<string, Record<string, string>> = {
   'Aave V3': {
     Base:     'https://app.aave.com/?marketName=proto_base_v3',
@@ -92,9 +90,9 @@ function getLink(protocol: string, chain: string): string {
 }
 
 const YIELD_STEPS: Record<string, string[]> = {
-  'Aave V3':     ['Abre o link do Aave abaixo', 'Muda a rede da MetaMask para a chain indicada', 'Clica em "Supply" ao lado de USDC', 'Introduz o valor e confirma na MetaMask', 'Começas a ganhar APY imediatamente'],
-  'Compound V3': ['Abre o link do Compound abaixo', 'Muda a rede da MetaMask para a chain indicada', 'Clica em "Supply" na coluna USDC', 'Aprova o contrato (1ª vez) + confirma o depósito', 'Juros acumulam-se por bloco'],
-  default:       ['Abre o link do protocolo', 'Muda a rede da MetaMask para a chain indicada', 'Vai à secção de "Supply" ou "Deposit"', 'Deposita o valor desejado e confirma na MetaMask'],
+  'Aave V3':     ['Abre o link do Aave abaixo', 'Muda a rede da MetaMask para a chain indicada', 'Clica em "Supply" ao lado do teu asset', 'Introduz o valor e confirma na MetaMask', 'Começas a ganhar APY imediatamente'],
+  'Compound V3': ['Abre o link do Compound abaixo', 'Muda a rede da MetaMask para a chain indicada', 'Clica em "Supply" na coluna do teu asset', 'Aprova o contrato (1ª vez) + confirma o depósito', 'Juros acumulam-se por bloco'],
+  default:       ['Abre o link do protocolo abaixo', 'Muda a rede da MetaMask para a chain indicada', 'Vai à secção "Supply" ou "Deposit"', 'Deposita o valor e confirma na MetaMask'],
 }
 
 function getSteps(protocol: string): string[] {
@@ -107,82 +105,143 @@ function fmtTvl(n: number) {
   return `$${(n / 1e3).toFixed(0)}K`
 }
 
-function TopYieldPick({ pool, ai }: { pool: YieldPool; ai: AIAnalysis | null }) {
-  const rec = ai ? REC_STYLES[ai.recommendation] : REC_STYLES.WATCH
-  const steps = getSteps(pool.protocol)
-  const link = getLink(pool.protocol, pool.chain)
+function fmtGain(amount: number, apy: number, days: number) {
+  if (!amount || !apy) return '$0.00'
+  return `$${((amount * apy / 100 / 365) * days).toFixed(2)}`
+}
+
+// ─── Pool card with inline calculator ────────────────────────────────────────
+
+function YieldPoolCard({ pool, rank }: { pool: YieldPool; rank: number }) {
+  const [amount, setAmount]     = useState('')
+  const [showSteps, setShowSteps] = useState(false)
+  const amountN = parseFloat(amount) || 0
+  const link    = getLink(pool.protocol, pool.chain)
+  const steps   = getSteps(pool.protocol)
+  const basePct   = pool.apy > 0 ? (pool.apyBase / pool.apy) * 100 : 100
+  const rewardPct = 100 - basePct
 
   return (
-    <div className={`border rounded-xl p-4 ${rec.bg} ${rec.border}`}>
-      <div className="flex items-center gap-2 mb-3">
-        <Brain className={`w-4 h-4 ${rec.text}`} />
-        <span className={`text-xs font-bold uppercase ${rec.text}`}>Melhor Oportunidade IA — Yield</span>
-        {ai && (
-          <span className={`ml-auto flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${rec.bg} ${rec.border} ${rec.text}`}>
-            {rec.icon}{rec.label}
-          </span>
-        )}
-      </div>
+    <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 hover:border-slate-600/60 overflow-hidden transition-all">
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          {/* Rank */}
+          <div className="shrink-0 w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400">
+            {rank}
+          </div>
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-white font-bold text-lg">{pool.protocol}</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${CHAIN_COLORS[pool.chain] ?? 'text-slate-400 border-slate-600'}`}>
-              {pool.chain}
-            </span>
-            <span className={`font-semibold text-sm ${ASSET_COLORS[pool.asset] ?? 'text-slate-200'}`}>{pool.asset}</span>
-          </div>
-          <div className="flex gap-4 mt-1 text-xs text-slate-400">
-            <span>APY Base <span className="text-emerald-400 font-medium">{pool.apyBase.toFixed(2)}%</span></span>
-            {pool.apyReward > 0 && <span>+ Reward <span className="text-blue-400 font-medium">{pool.apyReward.toFixed(2)}%</span></span>}
-            <span>TVL <span className="text-slate-200 font-medium">{fmtTvl(pool.tvlUsd)}</span></span>
-          </div>
-          {ai?.reasoning && <p className="mt-2 text-xs text-slate-300 italic">"{ai.reasoning}"</p>}
-          {ai?.risks && ai.risks.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {ai.risks.map((r) => (
-                <span key={r} className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded">{r}</span>
-              ))}
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="font-bold text-white">{pool.protocol}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${CHAIN_COLORS[pool.chain] ?? 'text-slate-400 border-slate-600'}`}>{pool.chain}</span>
+              <span className={`text-sm font-semibold ${ASSET_COLORS[pool.asset] ?? 'text-slate-200'}`}>{pool.asset}</span>
             </div>
-          )}
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-3xl font-bold text-emerald-400">{pool.apy.toFixed(2)}%</p>
-          <p className="text-[10px] text-slate-500">APY total</p>
-          {ai && <p className="text-sm font-bold text-slate-300 mt-1">Score {ai.score}</p>}
-        </div>
-      </div>
+            <div className="flex items-center gap-3 mt-1.5">
+              <div className="flex-1 max-w-[200px]">
+                <div className="flex h-2 rounded-full overflow-hidden bg-slate-700">
+                  <div className="bg-emerald-500" style={{ width: `${basePct}%` }} />
+                  {rewardPct > 1 && <div className="bg-blue-400" style={{ width: `${rewardPct}%` }} />}
+                </div>
+                <div className="flex justify-between text-[10px] mt-0.5">
+                  <span className="text-emerald-400">base {pool.apyBase.toFixed(2)}%</span>
+                  {pool.apyReward > 0 && <span className="text-blue-400">+reward {pool.apyReward.toFixed(2)}%</span>}
+                </div>
+              </div>
+              <span className="text-xs text-slate-500">TVL <span className="text-slate-300">{fmtTvl(pool.tvlUsd)}</span></span>
+            </div>
+          </div>
 
-      <div className="mt-4 border-t border-white/10 pt-3">
-        <p className="text-xs font-semibold text-slate-300 mb-2">Como depositar (passo a passo):</p>
-        <ol className="space-y-1">
-          {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
-              <span className="shrink-0 w-4 h-4 rounded-full bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
-              {s}
-            </li>
-          ))}
-        </ol>
-        {link !== '#' && (
-          <a href={link} target="_blank" rel="noopener noreferrer"
-            className={`mt-3 inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${rec.bg} ${rec.border} ${rec.text} hover:opacity-80`}
-          >
-            <ExternalLink className="w-3 h-3" />
-            Abrir {pool.protocol} — {pool.chain}
-          </a>
+          {/* APY */}
+          <div className="shrink-0 text-right">
+            <p className="text-2xl font-bold text-emerald-400">{pool.apy.toFixed(2)}%</p>
+            <p className="text-[10px] text-slate-500">APY</p>
+          </div>
+        </div>
+
+        {/* ── Gain calculator ── */}
+        <div className="mt-3 pt-3 border-t border-slate-700/40">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-slate-500" />
+              <span className="text-xs text-slate-400">Quanto tens para depositar?</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0"
+                  className="w-24 bg-slate-900/70 border border-slate-600 rounded-lg pl-5 pr-2 py-1.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              {amountN > 0 ? (
+                <div className="flex gap-2 text-xs">
+                  <span className="text-slate-500">Dia <span className="text-emerald-400 font-semibold">{fmtGain(amountN, pool.apy, 1)}</span></span>
+                  <span className="text-slate-500">Mês <span className="text-emerald-400 font-semibold">{fmtGain(amountN, pool.apy, 30)}</span></span>
+                  <span className="text-slate-500">Ano <span className="text-emerald-400 font-semibold">{fmtGain(amountN, pool.apy, 365)}</span></span>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-600 italic">
+                  ex: $1 000 → Mês +${(1000 * pool.apy / 100 / 12).toFixed(2)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+            {link !== '#' ? (
+              <a href={link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                Depositar em {pool.protocol}
+              </a>
+            ) : (
+              <span className="text-xs text-slate-500 italic">Pesquisa "{pool.protocol}" para depositar</span>
+            )}
+            <button
+              onClick={() => setShowSteps(!showSteps)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-700 rounded-lg transition-colors"
+            >
+              {showSteps ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showSteps ? 'Ocultar passos' : 'Ver passos'}
+            </button>
+          </div>
+        </div>
+
+        {showSteps && (
+          <div className="mt-3 pt-3 border-t border-slate-700/30 bg-slate-900/30 rounded-lg p-3">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase mb-2">Passo a passo</p>
+            <ol className="space-y-1.5">
+              {steps.map((s, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                  <span className="shrink-0 w-4 h-4 rounded-full bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
       </div>
     </div>
   )
 }
 
+// ─── Rotation opportunity card with gain calculator ───────────────────────────
+
 function OppCard({ opp }: { opp: YieldOpportunity }) {
-  const [expanded, setExpanded] = useState(false)
-  const [ai, setAI] = useState<AIAnalysis | null>(null)
-  const [analyzing, setAnalyzing] = useState(false)
-  const link = getLink(opp.toProtocol, opp.toChain)
-  const steps = getSteps(opp.toProtocol)
+  const [expanded, setExpanded]       = useState(false)
+  const [ai, setAI]                   = useState<AIAnalysis | null>(null)
+  const [analyzing, setAnalyzing]     = useState(false)
+  const [rotateAmount, setRotateAmount] = useState('')
+  const rotateN = parseFloat(rotateAmount) || 0
+  const link    = getLink(opp.toProtocol, opp.toChain)
+  const steps   = getSteps(opp.toProtocol)
+  const rec     = ai ? REC_STYLES[ai.recommendation] : null
+  const extraPerMonth = rotateN > 0 ? rotateN * opp.gainPct / 100 / 12 : 0
+  const extraPerYear  = rotateN > 0 ? rotateN * opp.gainPct / 100      : 0
 
   const analyze = async () => {
     setAnalyzing(true)
@@ -197,12 +256,11 @@ function OppCard({ opp }: { opp: YieldOpportunity }) {
     } catch { /* ignore */ } finally { setAnalyzing(false) }
   }
 
-  const rec = ai ? REC_STYLES[ai.recommendation] : null
-
   return (
     <div className="bg-slate-800/60 border border-green-500/20 rounded-xl overflow-hidden">
       <div className="p-4">
-        <div className="flex items-center gap-2 mb-2">
+        {/* Header */}
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className={`font-semibold ${ASSET_COLORS[opp.asset] ?? 'text-slate-200'}`}>{opp.asset}</span>
           <span className="text-green-400 font-bold text-sm">+{opp.gainPct.toFixed(2)}% APY</span>
           {rec && (
@@ -211,30 +269,68 @@ function OppCard({ opp }: { opp: YieldOpportunity }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-400">
+
+        {/* Route */}
+        <div className="flex items-center gap-2 text-xs text-slate-400 mb-1 flex-wrap">
           <span className="text-slate-300">{opp.fromProtocol}</span>
           <span className={`text-[10px] px-1 rounded ${CHAIN_COLORS[opp.fromChain] ?? ''}`}>{opp.fromChain}</span>
-          <ArrowRight className="w-3 h-3 text-green-400" />
+          <ArrowRight className="w-3 h-3 text-green-400 shrink-0" />
           <span className="text-slate-300 font-medium">{opp.toProtocol}</span>
           <span className={`text-[10px] px-1 rounded ${CHAIN_COLORS[opp.toChain] ?? ''}`}>{opp.toChain}</span>
         </div>
-        <div className="mt-2 flex items-center justify-between text-xs">
-          <span className="text-slate-500">{opp.currentApy.toFixed(2)}% → <span className="text-emerald-400 font-medium">{opp.targetApy.toFixed(2)}%</span></span>
-          <div className="flex items-center gap-1">
+        <p className="text-xs text-slate-500 mb-3">
+          {opp.currentApy.toFixed(2)}% → <span className="text-emerald-400 font-medium">{opp.targetApy.toFixed(2)}%</span>
+        </p>
+
+        {/* ── Gain calculator for rotation ── */}
+        <div className="pt-3 border-t border-slate-700/40">
+          <div className="flex items-center gap-2 flex-wrap mb-2.5">
+            <TrendingUp className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="text-xs text-slate-400">Se moveres</span>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">$</span>
+              <input
+                type="number"
+                value={rotateAmount}
+                onChange={(e) => setRotateAmount(e.target.value)}
+                placeholder="0"
+                className="w-24 bg-slate-900/70 border border-slate-600 rounded-lg pl-5 pr-2 py-1.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+            {rotateN > 0 ? (
+              <div className="flex gap-2 text-xs">
+                <span className="text-slate-500">extra/Mês <span className="text-emerald-400 font-semibold">+${extraPerMonth.toFixed(2)}</span></span>
+                <span className="text-slate-500">Ano <span className="text-emerald-400 font-semibold">+${extraPerYear.toFixed(2)}</span></span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-600 italic">para ver o ganho extra desta rotação</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {link !== '#' && (
+              <a href={link} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                Rotar para {opp.toProtocol}
+              </a>
+            )}
             {!ai && (
               <button onClick={analyze} disabled={analyzing}
-                className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-purple-400 border border-purple-500/30 hover:border-purple-400 rounded transition-colors disabled:opacity-50">
+                className="flex items-center gap-1 px-2 py-1.5 text-[10px] text-purple-400 border border-purple-500/30 hover:border-purple-400 rounded-lg transition-colors disabled:opacity-50">
                 <Brain className={`w-2.5 h-2.5 ${analyzing ? 'animate-pulse' : ''}`} />
                 {analyzing ? 'IA…' : 'Analisar'}
               </button>
             )}
             <button onClick={() => setExpanded(!expanded)}
-              className="text-slate-500 hover:text-slate-300 p-0.5 transition-colors">
-              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-700 rounded-lg transition-colors">
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {expanded ? 'Ocultar passos' : 'Ver passos'}
             </button>
           </div>
         </div>
-        {ai?.reasoning && <p className="mt-1.5 text-xs text-slate-400 italic">"{ai.reasoning}"</p>}
+
+        {ai?.reasoning && <p className="mt-2 text-xs text-slate-400 italic">"{ai.reasoning}"</p>}
       </div>
 
       {expanded && (
@@ -261,21 +357,24 @@ function OppCard({ opp }: { opp: YieldOpportunity }) {
   )
 }
 
+type SubTab = 'pools' | 'rotations'
+
+// ─── Main tab ────────────────────────────────────────────────────────────────
+
 export function YieldTab() {
-  const [data, setData] = useState<YieldData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData]           = useState<YieldData | null>(null)
+  const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [activeAsset, setActiveAsset] = useState<string>('all')
-  const [topAI, setTopAI] = useState<AIAnalysis | null>(null)
-  const [analyzingTop, setAnalyzingTop] = useState(false)
+  const [subTab, setSubTab]       = useState<SubTab>('pools')
   const [tabLoaded, setTabLoaded] = useState(false)
 
   const fetchData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     try {
-      const res = await fetch('/api/yield-rates')
+      const res  = await fetch('/api/yield-rates')
       const json = await res.json()
       setData(json)
     } catch {
@@ -290,37 +389,19 @@ export function YieldTab() {
     if (!tabLoaded) { setTabLoaded(true); fetchData() }
   }, [tabLoaded, fetchData])
 
-  const pools = data?.pools ?? []
-  const opps = data?.opportunities ?? []
-  const bestPerAsset = data?.bestPerAsset ?? {}
+  const pools    = data?.pools ?? []
+  const opps     = data?.opportunities ?? []
   const hasError = !!data?.error
 
-  const filteredPools = activeAsset === 'all' ? pools : pools.filter((p) => p.asset === activeAsset)
-  const filteredOpps  = activeAsset === 'all' ? opps  : opps.filter((o) => o.asset === activeAsset)
-  const bestGain = opps.length > 0 ? Math.max(...opps.map((o) => o.gainPct)) : null
+  const filteredPools = (activeAsset === 'all' ? pools : pools.filter((p) => p.asset === activeAsset))
+    .sort((a, b) => b.apy - a.apy)
+  const filteredOpps = activeAsset === 'all' ? opps : opps.filter((o) => o.asset === activeAsset)
 
-  // Best pool = highest APY on Base/Polygon (low gas)
-  const topPool = pools
-    .filter((p) => p.chain === 'Base' || p.chain === 'Polygon' || p.chain === 'Arbitrum')
-    .sort((a, b) => b.apy - a.apy)[0] ?? pools[0]
-
-  const analyzeTop = useCallback(async (pool: YieldPool) => {
-    setAnalyzingTop(true)
-    try {
-      const res = await fetch('/api/analyze-opportunity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ protocol: pool.protocol, chain: pool.chain, apy: pool.apy, tvl: pool.tvlUsd, type: 'YIELD' }),
-      })
-      const json = await res.json()
-      if (json.analysis) setTopAI(json.analysis)
-    } catch { /* ignore */ } finally { setAnalyzingTop(false) }
-  }, [])
-
-  // AI analysis only on user request — don't auto-run on mount
+  const bestAPY  = pools.length > 0 ? Math.max(...pools.map((p) => p.apy)) : 0
+  const bestGain = opps.length  > 0 ? Math.max(...opps.map((o) => o.gainPct)) : 0
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <StrategyValidationPanel
         strategy="YIELD"
         label="Yield Farming Rotation"
@@ -329,15 +410,15 @@ export function YieldTab() {
         loading={loading}
         error={hasError}
         opportunityCount={opps.length}
-        bestValueLabel={bestGain != null && bestGain > 0 ? `+${bestGain.toFixed(2)}% APY` : null}
+        bestValueLabel={bestGain > 0 ? `+${bestGain.toFixed(2)}% APY` : null}
         sources={['DefiLlama', 'Aave V3', 'Compound V3']}
         alerts={{ urgent: 0, high: opps.filter((o) => o.gainPct > 5).length, medium: opps.filter((o) => o.gainPct > 2 && o.gainPct <= 5).length }}
         dataConfidence="HIGH"
       />
 
       <div className="flex flex-wrap items-center gap-3">
-        <CapitalBadge strategy="YIELD" apy={bestGain ?? undefined} />
-        <ReturnSimulator strategy="YIELD" apy={bestGain ?? undefined} chain="Base" />
+        <CapitalBadge strategy="YIELD" apy={bestGain || undefined} />
+        <ReturnSimulator strategy="YIELD" apy={bestGain || undefined} chain="Base" />
       </div>
 
       {loading && (
@@ -361,134 +442,84 @@ export function YieldTab() {
 
       {!loading && !hasError && (
         <>
-          {/* Execute directly inside the tool */}
-          <ExecutePanel apy={topPool?.apy ?? bestGain ?? 0} />
-
-          {/* Top Pick IA */}
-          {topPool && (
-            <div>
-              {analyzingTop && !topAI ? (
-                <div className="border border-slate-700/50 rounded-xl p-4 flex items-center gap-2 text-xs text-slate-400">
-                  <Brain className="w-4 h-4 animate-pulse text-purple-400" />
-                  A analisar melhor oportunidade com IA…
-                  <button onClick={() => analyzeTop(topPool)} className="ml-auto text-xs text-purple-400 hover:text-purple-300">
-                    Analisar agora
-                  </button>
-                </div>
-              ) : topAI ? (
-                <TopYieldPick pool={topPool} ai={topAI} />
-              ) : (
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => analyzeTop(topPool)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-purple-400 border border-purple-500/30 hover:border-purple-400 rounded-lg transition-colors"
-                  >
-                    <Brain className="w-3 h-3" />
-                    Análise IA do melhor pool
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* My active positions */}
-          <MyPositions />
-
-          {/* Best per asset */}
+          {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
-            {['USDC', 'USDT', 'DAI'].map((asset) => {
-              const best = bestPerAsset[asset]
-              return (
-                <div key={asset} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
-                  <p className={`text-xs font-semibold mb-1 ${ASSET_COLORS[asset] ?? 'text-slate-400'}`}>{asset}</p>
-                  {best ? (
-                    <>
-                      <p className="text-2xl font-bold text-emerald-400">{best.apy.toFixed(2)}%</p>
-                      <p className="text-xs text-slate-500 mt-1">{best.protocol} · {best.chain}</p>
-                    </>
-                  ) : <p className="text-slate-600 text-sm">Sem dados</p>}
-                </div>
-              )
-            })}
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+              <p className="text-xs text-slate-500">Melhor APY</p>
+              <p className="text-2xl font-bold text-emerald-400">{bestAPY.toFixed(2)}%</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">rede de menor gas</p>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+              <p className="text-xs text-slate-500">Melhor rotação</p>
+              <p className="text-2xl font-bold text-green-400">{bestGain > 0 ? `+${bestGain.toFixed(2)}%` : '—'}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">ganho ao mudar protocolo</p>
+            </div>
+            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+              <p className="text-xs text-slate-500">Pools activos</p>
+              <p className="text-2xl font-bold text-blue-400">{pools.length}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">{opps.length} rotações disponíveis</p>
+            </div>
           </div>
 
-          {/* Rotation opportunities */}
-          {filteredOpps.length > 0 && (
-            <div>
-              <h3 className="font-semibold text-slate-200 mb-3 flex items-center gap-2">
-                <ArrowRight className="w-4 h-4 text-green-400" />
-                Oportunidades de rotação ({filteredOpps.length})
-                <span className="text-xs text-slate-500 font-normal">— clica ▾ para ver como executar</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredOpps.slice(0, 6).map((opp, i) => <OppCard key={i} opp={opp} />)}
-              </div>
-            </div>
-          )}
-
-          {/* Filter + pools table */}
-          <div className="flex gap-2 items-center">
-            {(['all', 'USDC', 'USDT', 'DAI'] as const).map((a) => (
-              <button key={a} onClick={() => setActiveAsset(a)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeAsset === a ? 'bg-slate-700 text-slate-200' : 'text-slate-500 hover:text-slate-300'}`}>
-                {a === 'all' ? 'Todos' : a} {a !== 'all' && `(${pools.filter((p) => p.asset === a).length})`}
+          {/* Sub-tabs + asset filter */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex gap-1">
+              <button onClick={() => setSubTab('pools')}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${subTab === 'pools' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-300 border border-slate-700'}`}>
+                🏦 Depositar ({filteredPools.length})
               </button>
-            ))}
-            <div className="ml-auto">
+              <button onClick={() => setSubTab('rotations')}
+                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${subTab === 'rotations' ? 'bg-slate-600 text-white' : 'text-slate-400 hover:text-slate-300 border border-slate-700'}`}>
+                🔄 Rotações ({filteredOpps.length})
+              </button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(['all', 'USDC', 'USDT', 'DAI'] as const).map((a) => (
+                <button key={a} onClick={() => setActiveAsset(a)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${activeAsset === a ? 'bg-slate-700 text-slate-200' : 'text-slate-500 hover:text-slate-300'}`}>
+                  {a === 'all' ? 'Todos' : a}
+                </button>
+              ))}
               <button onClick={() => fetchData(true)} disabled={refreshing}
-                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors">
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50 ml-1">
+                <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
                 Atualizar
               </button>
             </div>
           </div>
 
-          <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-700/50 bg-slate-900/50">
-                    <th className="text-left p-3 text-slate-400 font-medium">Protocol</th>
-                    <th className="text-left p-3 text-slate-400 font-medium">Chain</th>
-                    <th className="text-left p-3 text-slate-400 font-medium">Asset</th>
-                    <th className="text-right p-3 text-slate-400 font-medium">APY Base</th>
-                    <th className="text-right p-3 text-slate-400 font-medium">APY Reward</th>
-                    <th className="text-right p-3 text-slate-400 font-medium">APY Total</th>
-                    <th className="text-right p-3 text-slate-400 font-medium">TVL</th>
-                    <th className="text-right p-3 text-slate-400 font-medium">Link</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPools.slice(0, 30).map((pool, i) => (
-                    <tr key={i} className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors">
-                      <td className="p-3 font-medium text-slate-200">{pool.protocol}</td>
-                      <td className="p-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border ${CHAIN_COLORS[pool.chain] ?? 'text-slate-400 border-slate-600'}`}>{pool.chain}</span>
-                      </td>
-                      <td className={`p-3 font-semibold ${ASSET_COLORS[pool.asset] ?? 'text-slate-300'}`}>{pool.asset}</td>
-                      <td className="p-3 text-right font-mono text-slate-300">{pool.apyBase.toFixed(2)}%</td>
-                      <td className="p-3 text-right font-mono text-blue-400">{pool.apyReward > 0 ? `+${pool.apyReward.toFixed(2)}%` : '—'}</td>
-                      <td className={`p-3 text-right font-mono font-semibold ${pool.apy > 5 ? 'text-emerald-400' : 'text-slate-300'}`}>{pool.apy.toFixed(2)}%</td>
-                      <td className="p-3 text-right text-slate-500 text-xs">{fmtTvl(pool.tvlUsd)}</td>
-                      <td className="p-3 text-right">
-                        {getLink(pool.protocol, pool.chain) !== '#' && (
-                          <a href={getLink(pool.protocol, pool.chain)} target="_blank" rel="noopener noreferrer"
-                            className="text-slate-600 hover:text-slate-300 transition-colors">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredPools.length === 0 && <p className="p-8 text-center text-slate-500">Nenhum pool encontrado</p>}
+          {/* Pools tab */}
+          {subTab === 'pools' && (
+            <div className="space-y-3">
+              {filteredPools.length === 0 ? (
+                <p className="text-center py-10 text-slate-500 text-sm">Nenhum pool encontrado</p>
+              ) : (
+                filteredPools.slice(0, 20).map((pool, i) => (
+                  <YieldPoolCard key={`${pool.protocol}-${pool.chain}-${pool.asset}`} pool={pool} rank={i + 1} />
+                ))
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Rotations tab */}
+          {subTab === 'rotations' && (
+            <div className="space-y-3">
+              {filteredOpps.length === 0 ? (
+                <div className="text-center py-10 text-slate-500 text-sm">
+                  Nenhuma rotação encontrada{activeAsset !== 'all' && ` para ${activeAsset} — tenta "Todos"`}
+                </div>
+              ) : (
+                filteredOpps.slice(0, 10).map((opp, i) => <OppCard key={i} opp={opp} />)
+              )}
+            </div>
+          )}
+
+          <MyPositions />
 
           {lastUpdate && (
-            <p className="text-xs text-slate-700 text-right">
-              Actualizado: {lastUpdate.toLocaleTimeString('pt-BR')} · Próxima atualização: 30 min
+            <p className="text-xs text-slate-700 text-right flex items-center justify-end gap-1">
+              <Clock className="w-3 h-3" />
+              {lastUpdate.toLocaleTimeString('pt-BR')} · Próxima atualização: 30 min
             </p>
           )}
         </>
