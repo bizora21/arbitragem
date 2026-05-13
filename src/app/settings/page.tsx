@@ -187,8 +187,8 @@ function WalletSection() {
               {parseFloat(c.usdcBalance) > 0 && (
                 <span><span className="text-slate-300">{parseFloat(c.usdcBalance).toFixed(2)}</span> USDC</span>
               )}
-              {parseFloat(c.ethBalance) > 0 && (
-                <span><span className="text-slate-300">{parseFloat(c.ethBalance).toFixed(4)}</span> ETH</span>
+              {parseFloat(c.nativeBalance) > 0 && (
+                <span><span className="text-slate-300">{parseFloat(c.nativeBalance).toFixed(4)}</span> {c.nativeSymbol}</span>
               )}
             </div>
           </div>
