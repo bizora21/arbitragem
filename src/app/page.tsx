@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { FundingTab } from '@/components/dashboard/funding-tab'
@@ -8,6 +8,7 @@ import { SpreadTab } from '@/components/dashboard/spread-tab'
 import { AirdropTab } from '@/components/dashboard/airdrop-tab'
 import { LPTab } from '@/components/dashboard/lp-tab'
 import { ValidationDashboard } from '@/components/dashboard/validation-dashboard'
+import { FlashLoanTab } from '@/components/dashboard/flash-loan-tab'
 import { AlertPanel } from '@/components/dashboard/alert-panel'
 import { StatsBar } from '@/components/dashboard/stats-bar'
 import { UserMenu } from '@/components/auth/user-menu'
@@ -17,7 +18,7 @@ import { WalletBalance } from '@/components/wallet/WalletBalance'
 import { useUser } from '@/hooks/use-user'
 import { Bell } from 'lucide-react'
 
-type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread' | 'validation'
+type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread' | 'flashloan' | 'validation'
 
 const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
   {
@@ -49,6 +50,12 @@ const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
     label: 'Funding Rate',
     emoji: '⚡',
     description: 'Delta-neutral · 8h window · OKX + Binance + Bybit · $5k+',
+  },
+  {
+    id: 'flashloan',
+    label: 'Flash Loan',
+    emoji: '⚡',
+    description: 'Aave V3 Base · zero capital · Arbitragem atómica · Aerodrome · BaseSwap',
   },
   {
     id: 'spread',
@@ -85,7 +92,7 @@ export default function DashboardPage() {
                 Multi-Strategy Survival Scanner
               </h1>
               <p className="text-xs text-slate-500 leading-none mt-0.5">
-                6 estratégias · Airdrop + LP + Yield + Depeg + Funding + Spread
+                7 estratégias · Airdrop + LP + Yield + Depeg + Funding + Spread + Flash Loan
               </p>
             </div>
           </div>
@@ -148,6 +155,7 @@ export default function DashboardPage() {
           {activeTab === 'yield'    && <YieldTab />}
           {activeTab === 'depeg'    && <DepegTab />}
           {activeTab === 'funding'  && <FundingTab />}
+          {activeTab === 'flashloan'  && <FlashLoanTab />}
           {activeTab === 'spread'     && <SpreadTab />}
           {activeTab === 'validation' && <ValidationDashboard />}
         </main>
@@ -189,3 +197,7 @@ export default function DashboardPage() {
     </div>
   )
 }
+
+
+
+
