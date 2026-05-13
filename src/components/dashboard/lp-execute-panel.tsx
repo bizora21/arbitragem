@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
 import { parseUnits, formatUnits, erc20Abi } from 'viem'
-import { base } from 'wagmi/chains'
-import { Droplets, CheckCircle, AlertTriangle, Loader2, ExternalLink, ArrowRight } from 'lucide-react'
+import { base, bsc } from 'wagmi/chains'
+import { Droplets, CheckCircle, AlertTriangle, Loader2, ExternalLink, ArrowRight, GitMerge } from 'lucide-react'
 import { AERODROME_ROUTER, AERODROME_ADD_LIQUIDITY_ABI, USDC, USDT, DAI } from '@/lib/contracts'
 
 // Stable pairs on Aerodrome Base
@@ -36,6 +36,7 @@ export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: numbe
   const [errorMsg, setErrorMsg] = useState('')
 
   const isOnBase = chainId === base.id
+  const isOnBsc  = chainId === bsc.id
   const enabled  = isConnected && !!address && isOnBase
 
   const amountABig = parseUnits(amountA || '0', pair.tokenA.decimals)
@@ -178,12 +179,117 @@ export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: numbe
         ))}
       </div>
 
-      {!isOnBase && (
+      {/* ── BSC detected: show bridge guide ── */}
+      {isOnBsc && (
+        <div className="space-y-4">
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+            <p className="text-xs font-semibold text-yellow-300 flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              USDT detectado na BSC — o Aerodrome corre na rede Base
+            </p>
+            <p className="text-xs text-slate-400">
+              São redes diferentes. Escolhe uma das duas opções abaixo para começar a ganhar.
+            </p>
+          </div>
+
+          {/* Option A: bridge */}
+          <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+              <GitMerge className="w-3.5 h-3.5 text-blue-400" />
+              Opção A — Faz bridge para Base e usa Aerodrome
+            </p>
+            <p className="text-[11px] text-slate-500">
+              APY mais alto · USDC/USDT LP · executa diretamente aqui depois
+            </p>
+            <ol className="space-y-1.5">
+              {[
+                'Vai a stargate.finance (mais rápido) ou app.across.to',
+                'Seleciona origem BSC → destino Base, token USDT',
+                'Introduz o valor e confirma (custo bridge: ~$0.50–2)',
+                'USDT chega na Base em 1–5 minutos',
+                'Muda a MetaMask para Base e usa o formulário acima',
+              ].map((s, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                  <span className="shrink-0 w-4 h-4 rounded-full bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
+                  {s}
+                </li>
+              ))}
+            </ol>
+            <div className="flex gap-2 pt-1">
+              <a href="https://stargate.finance/transfer" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" /> Stargate Finance
+              </a>
+              <a href="https://app.across.to" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" /> Across Protocol
+              </a>
+            </div>
+          </div>
+
+          {/* Option B: stay on BSC */}
+          <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3 space-y-2">
+            <p className="text-xs font-semibold text-slate-200">
+              Opção B — LP/Yield diretamente na BSC
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Sem bridge · APY ligeiramente menor · já tens os fundos lá
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <a href="https://pancakeswap.finance/liquidity" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-slate-600 text-slate-300 hover:border-slate-500 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <div>
+                  <p>PancakeSwap</p>
+                  <p className="text-[10px] text-slate-500">USDT/USDC LP · BSC</p>
+                </div>
+              </a>
+              <a href="https://app.venus.io/markets" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-slate-600 text-slate-300 hover:border-slate-500 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <div>
+                  <p>Venus Protocol</p>
+                  <p className="text-[10px] text-slate-500">Supply USDT · BSC</p>
+                </div>
+              </a>
+              <a href="https://thena.fi/liquidity" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-slate-600 text-slate-300 hover:border-slate-500 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <div>
+                  <p>THENA</p>
+                  <p className="text-[10px] text-slate-500">Stablecoin LP · BSC</p>
+                </div>
+              </a>
+              <a href="https://alpacafinance.org" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-slate-600 text-slate-300 hover:border-slate-500 rounded-lg transition-colors">
+                <ExternalLink className="w-3 h-3" />
+                <div>
+                  <p>Alpaca Finance</p>
+                  <p className="text-[10px] text-slate-500">Yield USDT · BSC</p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <button
+            onClick={() => switchChain({ chainId: base.id })}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors"
+          >
+            Mudar para Base agora (após bridge)
+          </button>
+        </div>
+      )}
+
+      {/* ── Wrong network (not BSC, not Base) ── */}
+      {!isOnBase && !isOnBsc && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-xs text-yellow-300">
             <AlertTriangle className="w-3.5 h-3.5" /> Muda para Base
           </span>
-          <button onClick={() => switchChain({ chainId: base.id })} className="text-xs px-3 py-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 rounded-lg">Mudar rede</button>
+          <button onClick={() => switchChain({ chainId: base.id })}
+            className="text-xs px-3 py-1 bg-yellow-500/20 border border-yellow-500/40 text-yellow-200 rounded-lg">
+            Mudar rede
+          </button>
         </div>
       )}
 
