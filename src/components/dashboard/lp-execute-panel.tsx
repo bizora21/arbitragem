@@ -21,15 +21,16 @@ const LP_PAIRS = [
     tokenB: { symbol: 'DAI',  address: DAI[base.id],  decimals: 18 },
     stable: true,
   },
-] as const
+]
 
+type LPPair = typeof LP_PAIRS[number]
 type TxStep = 'idle' | 'approveA_wait' | 'approveB_wait' | 'adding' | 'add_wait' | 'done' | 'error'
 
 export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: number; emissionAPY?: number }) {
   const { address, isConnected, chainId } = useAccount()
   const { switchChain } = useSwitchChain()
 
-  const [pair, setPair]       = useState(LP_PAIRS[0])
+  const [pair, setPair]       = useState<LPPair>(LP_PAIRS[0])
   const [amountA, setAmountA] = useState('')
   const [step, setStep]       = useState<TxStep>('idle')
   const [errorMsg, setErrorMsg] = useState('')

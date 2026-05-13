@@ -362,7 +362,7 @@ export function YieldTab() {
       {!loading && !hasError && (
         <>
           {/* Execute directly inside the tool */}
-          <ExecutePanel apy={topPool?.apy ?? bestGain ?? 0} protocol="Aave V3" chain="Base" />
+          <ExecutePanel apy={topPool?.apy ?? bestGain ?? 0} />
 
           {/* Top Pick IA */}
           {topPool && (
