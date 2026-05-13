@@ -52,7 +52,7 @@ export function WalletBalance() {
             <p className="text-lg font-bold text-white mt-0.5">{fmtUsd(totalUsd)}</p>
             <div className="flex gap-3 mt-1 text-xs text-slate-400">
               <span>USDC <span className="text-slate-200">{fmtUsd(totalUsdc)}</span></span>
-              <span>ETH <span className="text-slate-200">{fmtUsd(totalEthUsd)}</span></span>
+              <span>Nativo <span className="text-slate-200">{fmtUsd(totalEthUsd)}</span></span>
             </div>
           </div>
 
@@ -77,8 +77,8 @@ export function WalletBalance() {
                   <div className="text-right">
                     <p className="text-xs font-medium text-slate-200">{fmtUsd(c.totalUsd)}</p>
                     <div className="flex gap-2 text-[10px] text-slate-500">
-                      {c.usdcUsd > 0 && <span>{fmtUsd(c.usdcUsd)} USDC</span>}
-                      {c.ethUsd > 0 && <span>{fmtEth(c.ethBalance)} ETH</span>}
+                      {c.usdcUsd > 0 && <span>{fmtUsd(c.usdcUsd)} USDC/USDT</span>}
+                      {c.nativeUsd > 0 && <span>{fmtEth(c.nativeBalance)} {c.nativeSymbol}</span>}
                     </div>
                   </div>
                 </div>

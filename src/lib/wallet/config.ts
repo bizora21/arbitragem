@@ -1,8 +1,8 @@
 import { createConfig, http } from 'wagmi'
-import { base, arbitrum, optimism, polygon, mainnet } from 'wagmi/chains'
+import { base, arbitrum, optimism, polygon, mainnet, bsc } from 'wagmi/chains'
 import { injected } from 'wagmi/connectors'
 
-export const supportedChains = [base, arbitrum, optimism, polygon, mainnet] as const
+export const supportedChains = [base, arbitrum, optimism, polygon, mainnet, bsc] as const
 
 export const wagmiConfig = createConfig({
   chains: supportedChains,
@@ -13,6 +13,7 @@ export const wagmiConfig = createConfig({
     [arbitrum.id]: http('https://arb1.arbitrum.io/rpc'),
     [optimism.id]: http('https://mainnet.optimism.io'),
     [polygon.id]:  http('https://polygon-rpc.com'),
+    [bsc.id]:      http('https://bsc-dataseed1.binance.org'),
   },
   ssr: true,
 })
