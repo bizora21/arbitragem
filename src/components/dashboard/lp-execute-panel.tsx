@@ -295,9 +295,59 @@ export function LPExecutePanel({ feeAPY = 0, emissionAPY = 0 }: { feeAPY?: numbe
 
       {/* Balances */}
       <div className="flex justify-between text-xs text-slate-400">
-        <span>{pair.tokenA.symbol} <span className="text-slate-200">${balanceA.toFixed(2)}</span></span>
-        <span>{pair.tokenB.symbol} <span className="text-slate-200">{balanceB.toFixed(pair.tokenB.decimals === 18 ? 4 : 2)}</span></span>
+        <span>
+          {pair.tokenA.symbol}{' '}
+          <span className={balanceA > 0 ? 'text-emerald-300' : 'text-red-400'}>${balanceA.toFixed(2)}</span>
+        </span>
+        <span>
+          {pair.tokenB.symbol}{' '}
+          <span className={balanceB > 0.01 ? 'text-emerald-300' : 'text-red-400'}>
+            {balanceB < 0.01 ? '0.00' : balanceB.toFixed(pair.tokenB.decimals === 18 ? 4 : 2)}
+          </span>
+        </span>
       </div>
+
+      {/* ── Missing second token: swap guide ── */}
+      {isOnBase && balanceA > 0.01 && balanceB < 0.01 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            Par LP precisa de {pair.tokenA.symbol} + {pair.tokenB.symbol} em igual valor
+          </p>
+          <p className="text-xs text-slate-300">
+            Tens <span className="text-white font-medium">${balanceA.toFixed(2)} {pair.tokenA.symbol}</span> mas{' '}
+            <span className="text-red-400 font-medium">0 {pair.tokenB.symbol}</span>.
+          </p>
+          <p className="text-xs text-slate-400">
+            Troca <span className="text-white">~${(balanceA / 2).toFixed(2)} {pair.tokenA.symbol}</span> por{' '}
+            <span className="text-white">{pair.tokenB.symbol}</span> no Aerodrome (taxa ~0.01%), depois volta aqui.
+          </p>
+          <ol className="space-y-1">
+            {[
+              `Clica no botão abaixo — abre o Aerodrome na página de Swap`,
+              `Seleciona ${pair.tokenA.symbol} (origem) → ${pair.tokenB.symbol} (destino)`,
+              `Introduz ~$${(balanceA / 2).toFixed(2)} e confirma na MetaMask`,
+              `Volta aqui — o botão de depósito fica ativo automaticamente`,
+            ].map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
+                <span className="shrink-0 w-4 h-4 rounded-full bg-slate-700 text-slate-300 text-[10px] flex items-center justify-center font-bold">{i + 1}</span>
+                {s}
+              </li>
+            ))}
+          </ol>
+          <a
+            href={`https://aerodrome.finance/swap?from=${
+              pair.tokenA.address
+            }&to=${pair.tokenB.address}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors w-full justify-center"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Trocar {pair.tokenA.symbol} → {pair.tokenB.symbol} no Aerodrome
+          </a>
+        </div>
+      )}
 
       {/* Amount — equal value for stable pair */}
       <div className="space-y-1.5">
