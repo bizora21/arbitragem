@@ -1,0 +1,21 @@
+{
+  "name": "flash-loan-bot",
+  "version": "1.0.0",
+  "description": "Flash Loan Arbitrage Bot — Base Chain",
+  "scripts": {
+    "compile":  "hardhat compile",
+    "deploy":   "hardhat run scripts/deploy.js --network base",
+    "verify":   "hardhat verify --network base",
+    "bot":      "node bot/arb-bot.mjs",
+    "test-arb": "node scripts/test-arb.js"
+  },
+  "dependencies": {
+    "dotenv":  "^16.4.0",
+    "ethers":  "^6.13.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts":          "^5.0.0",
+    "hardhat":                          "^2.22.0"
+  }
+}
