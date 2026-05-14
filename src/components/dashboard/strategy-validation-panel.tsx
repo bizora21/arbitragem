@@ -10,7 +10,7 @@ export interface StrategyAlertCounts {
 }
 
 export interface StrategyValidationPanelProps {
-  strategy: 'FUNDING' | 'DEPEG' | 'YIELD' | 'SPREAD'
+  strategy: 'FUNDING' | 'DEPEG' | 'YIELD' | 'SPREAD' | 'FLASH_LOAN'
   label: string
   icon: string
   timestamp: string | null
