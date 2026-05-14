@@ -7,22 +7,13 @@ import { updateAllScores } from './confidence-scorer'
 import { generatePredictiveAlerts } from './predictive-engine'
 import { scanAirdropCandidates } from './airdrop-tracker'
 import { scanLPPools } from './lp-scanner'
-import { scanFlashLoanOpportunities, createFlashLoanPaperTrade, expireOldFlashLoanPaperTrades } from './flash-loan-scanner'
+import { scanFlashLoanOpportunities } from './flash-loan-scanner'
 
 let running = false
 const handles: ReturnType<typeof setInterval>[] = []
 
 async function flashLoanCycle() {
-  const result = await scanFlashLoanOpportunities()
-
-  // Criar paper trades para oportunidades lucrativas
-  const profitable = result.opportunities.filter(o => o.netProfitUSD > 0.05 && o.confidence !== 'LOW')
-  for (const opp of profitable.slice(0, 5)) {
-    await createFlashLoanPaperTrade(opp).catch(() => {})
-  }
-
-  // Expirar trades antigos
-  await expireOldFlashLoanPaperTrades()
+  await scanFlashLoanOpportunities()
 }
 
 async function fundingCycle() {
