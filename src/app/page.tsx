@@ -9,6 +9,7 @@ import { AirdropTab } from '@/components/dashboard/airdrop-tab'
 import { LPTab } from '@/components/dashboard/lp-tab'
 import { ValidationDashboard } from '@/components/dashboard/validation-dashboard'
 import { FlashLoanTab } from '@/components/dashboard/flash-loan-tab'
+import { AaveLiquidationTab } from '@/components/dashboard/aave-liquidation-tab'
 import { AlertPanel } from '@/components/dashboard/alert-panel'
 import { StatsBar } from '@/components/dashboard/stats-bar'
 import { UserMenu } from '@/components/auth/user-menu'
@@ -18,7 +19,7 @@ import { WalletBalance } from '@/components/wallet/WalletBalance'
 import { useUser } from '@/hooks/use-user'
 import { Bell } from 'lucide-react'
 
-type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread' | 'flashloan' | 'validation'
+type Tab = 'airdrop' | 'lp' | 'yield' | 'depeg' | 'funding' | 'spread' | 'flashloan' | 'validation' | 'liquidations'
 
 const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
   {
@@ -68,6 +69,12 @@ const TABS: { id: Tab; label: string; emoji: string; description: string }[] = [
     label: 'Validação',
     emoji: '📊',
     description: 'Edge Tracker · Persistência · Paper Trades · Veredicto GO/NO-GO',
+  },
+  {
+    id: 'liquidations',
+    label: 'Aave Monitor',
+    emoji: '🔴',
+    description: 'Liquidation bot · Posições Aave V3 em risco · Base Chain · HF em tempo real',
   },
 ]
 
@@ -157,7 +164,8 @@ export default function DashboardPage() {
           {activeTab === 'funding'  && <FundingTab />}
           {activeTab === 'flashloan'  && <FlashLoanTab />}
           {activeTab === 'spread'     && <SpreadTab />}
-          {activeTab === 'validation' && <ValidationDashboard />}
+          {activeTab === 'validation'  && <ValidationDashboard />}
+          {activeTab === 'liquidations' && <AaveLiquidationTab />}
         </main>
 
         <aside className="hidden lg:flex flex-col w-72 flex-shrink-0 bg-slate-900/60 border border-slate-700/50 rounded-xl sticky top-24 max-h-[calc(100vh-7rem)] overflow-hidden">
